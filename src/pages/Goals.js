@@ -79,9 +79,6 @@ const Goals = () => {
       <div className="space-y-4">
         {goals.map((goal) => {
           const progress = (goal.currentAmount / goal.targetAmount) * 100;
-          const requiredMonthly = goal.calculateRequiredMonthlyContribution
-            ? goal.calculateRequiredMonthlyContribution()
-            : 0;
 
           return (
             <div key={goal._id} className="card hover:shadow-md transition-shadow">
