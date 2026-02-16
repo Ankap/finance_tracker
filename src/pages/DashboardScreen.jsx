@@ -26,7 +26,7 @@ const DashboardScreen = () => {
         {/* Net Worth Card */}
         <div className="bg-white rounded-2xl p-8 mb-6 shadow-sm">
           <div className="text-center">
-            <h2 className="text-5xl font-bold text-gray-900 mb-2">₹12,50,000</h2>
+            <h2 className="text-5xl font-bold text-gray-900 mb-2">₹77,50,000</h2>
             <p className="text-gray-500 text-lg mb-4">Total Net Worth</p>
             <div className="flex items-center justify-center gap-2">
               <span className="text-green-600 font-semibold text-lg">+4.2%</span>
