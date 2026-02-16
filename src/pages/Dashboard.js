@@ -450,14 +450,12 @@ const DashboardScreen = () => {
               <div className="flex items-center gap-2">
                 <span className="text-gray-600 text-sm">Income:</span>
                 <span className="font-semibold text-gray-900">{formatFullCurrency(income)}</span>
-                {renderChangeIndicator(incomeChangePercentage)}
               </div>
 
               {/* Expenses */}
               <div className="flex items-center gap-2">
                 <span className="text-gray-600 text-sm">Expenses:</span>
                 <span className="font-semibold text-gray-900">{formatFullCurrency(expenses)}</span>
-                {renderChangeIndicator(expenseChangePercentage)}
               </div>
 
               {/* Savings Rate */}
@@ -471,7 +469,6 @@ const DashboardScreen = () => {
               <div className="flex items-center gap-2">
                 <span className="text-gray-600 text-sm">Savings:</span>
                 <span className="font-semibold text-gray-900">{formatFullCurrency(savingsAmount)}</span>
-                {renderChangeIndicator(savingsAmountChangePercentage)}
               </div>
             </div>
           </div>
