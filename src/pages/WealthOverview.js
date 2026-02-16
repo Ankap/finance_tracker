@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, BarChart3, Sparkles } from 'lucide-react';
 import { assetsAPI, insightsAPI } from '../services/api';
 import { formatCurrency, formatPercentage, getAssetIcon } from '../utils/formatters';
@@ -11,11 +11,7 @@ const WealthOverview = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOwner, setSelectedOwner] = useState('All');
 
-  useEffect(() => {
-    fetchWealthData();
-  }, [selectedOwner]);
-
-  const fetchWealthData = async () => {
+  const fetchWealthData = useCallback(async () => {
     try {
       setLoading(true);
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
@@ -34,7 +30,11 @@ const WealthOverview = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOwner]);
+
+  useEffect(() => {
+    fetchWealthData();
+  }, [fetchWealthData]);
 
   if (loading) {
     return (

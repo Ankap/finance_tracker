@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, TrendingUp, Target, FileText, Check, Sparkles } from 'lucide-react';
-import { assetsAPI, goalsAPI, statementsAPI } from '../services/api';
-import { formatCurrency } from '../utils/formatters';
+import { assetsAPI, statementsAPI } from '../services/api';
 
 const UpdateData = () => {
   const [activeTab, setActiveTab] = useState('assets');
@@ -16,11 +15,7 @@ const UpdateData = () => {
     owner: 'Joint',
   });
 
-  // Goal review state
-  const [goalProgress, setGoalProgress] = useState({
-    goalId: '',
-    amount: '',
-  });
+
 
   // Statement upload state
   const [statementUpload, setStatementUpload] = useState({

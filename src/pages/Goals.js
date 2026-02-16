@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Calendar, Plus } from 'lucide-react';
+import { Target, Calendar, Plus } from 'lucide-react';
 import { goalsAPI } from '../services/api';
 import { formatCurrency, formatDate, getGoalIcon, getStatusColor } from '../utils/formatters';
 
 const Goals = () => {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [ setShowAddModal] = useState(false);
 
   useEffect(() => {
     fetchGoals();

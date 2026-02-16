@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Receipt, TrendingUp, Sparkles, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Receipt, Sparkles, Calendar } from 'lucide-react';
 import { transactionsAPI, insightsAPI } from '../services/api';
 import { formatCurrency, getCategoryIcon } from '../utils/formatters';
 
@@ -13,11 +13,7 @@ const Expenses = () => {
     month: new Date().getMonth() + 1,
   });
 
-  useEffect(() => {
-    fetchExpenseData();
-  }, [selectedMonth]);
-
-  const fetchExpenseData = async () => {
+  const fetchExpenseData = useCallback(async () => {
     try {
       setLoading(true);
       const [summaryResponse, insightsResponse, transactionsResponse] = await Promise.all([
@@ -38,7 +34,11 @@ const Expenses = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    fetchExpenseData();
+  }, [fetchExpenseData]);
 
   if (loading) {
     return (
