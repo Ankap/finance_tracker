@@ -5,7 +5,7 @@ import WealthOverviewScreen from './pages/WealthOverviewScreen';
 import UpdateDataScreen from './pages/UpdateDataScreen';
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState('dashboard');
+  const [currentScreen] = useState('dashboard');
 
   const renderScreen = () => {
     switch (currentScreen) {

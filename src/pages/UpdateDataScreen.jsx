@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Check, Sparkles, User } from 'lucide-react';
 
 const UpdateDataScreen = () => {
-  const [activeTab, setActiveTab] = useState('assets');
 
   const tasks = [
     {
