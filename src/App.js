@@ -6,6 +6,7 @@ import WealthOverview from './pages/WealthOverview';
 import Goals from './pages/Goals';
 import Expenses from './pages/Expenses';
 import UpdateData from './pages/UpdateData';
+import AISummary from './pages/AISummary';
 import './index.css';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
           <Route path="/goals" element={<Goals />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/update" element={<UpdateData />} />
+          <Route path="/ai-summary" element={<AISummary />} />
         </Routes>
       </Layout>
     </Router>

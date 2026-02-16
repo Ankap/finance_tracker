@@ -29,7 +29,7 @@
   }
   
   .btn-primary {
-    @apply bg-sage-600 text-white px-6 py-2.5 rounded-lg hover:bg-sage-700 transition-colors font-medium;
+    @apply bg-sage-600 text-white px-4 py-2 rounded-lg hover:bg-sage-700 transition-colors font-medium text-sm;
   }
   
   .btn-secondary {
@@ -41,11 +41,11 @@
   }
   
   .nav-link {
-    @apply px-6 py-3 text-gray-600 hover:text-sage-700 hover:bg-sage-50 rounded-lg transition-colors font-medium;
+    @apply px-4 py-2 text-sm text-gray-600 hover:text-sage-700 hover:bg-sage-50 rounded-lg transition-colors font-medium;
   }
-  
+
   .nav-link-active {
-    @apply px-6 py-3 text-sage-700 bg-sage-50 rounded-lg font-medium border-b-2 border-sage-600;
+    @apply px-4 py-2 text-sm text-sage-700 bg-sage-50 rounded-lg font-medium border-b-2 border-sage-600;
   }
 }
 

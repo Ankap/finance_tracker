@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, TrendingUp, Target, IndianRupee, Upload, X } from 'lucide-react';
+import { Home, TrendingUp, Target, IndianRupee, Upload, X, Sparkles } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const [showEnlarged, setShowEnlarged] = useState(false);
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: Home },
+    { path: '/', label: 'Overview', icon: Home },
     { path: '/wealth', label: 'Wealth', icon: TrendingUp },
     { path: '/goals', label: 'Goals', icon: Target },
     { path: '/expenses', label: 'Expenses', icon: IndianRupee },
+    { path: '/ai-summary', label: 'AI Summary', icon: Sparkles },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -40,7 +41,7 @@ const Layout = ({ children }) => {
               </div>
             </Link>
             
-            <nav className="hidden md:flex items-center space-x-2">
+            <nav className="hidden md:flex items-center space-x-1">
               {navItems.map(({ path, label, icon: Icon }) => (
                 <Link
                   key={path}
@@ -49,8 +50,8 @@ const Layout = ({ children }) => {
                     isActive(path) ? 'nav-link-active' : 'nav-link'
                   }
                 >
-                  <div className="flex items-center gap-2">
-                    <Icon size={18} />
+                  <div className="flex items-center gap-1.5">
+                    <Icon size={16} />
                     <span>{label}</span>
                   </div>
                 </Link>
@@ -59,9 +60,9 @@ const Layout = ({ children }) => {
 
             <Link
               to="/update"
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-2 text-sm"
             >
-              <Upload size={18} />
+              <Upload size={16} />
               <span>Update Data</span>
             </Link>
           </div>
