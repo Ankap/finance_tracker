@@ -1,11 +1,14 @@
 {
-  "name": "finance-app-screens",
+  "name": "finance-app-frontend",
   "version": "1.0.0",
-  "description": "Finance App UI Screens - Anurag & Nidi",
+  "description": "Personal Finance App Frontend for Anurag & Nidhi",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+"recharts": "^2.10.3",
+    "date-fns": "^2.30.0",
     "lucide-react": "^0.294.0"
   },
   "scripts": {
