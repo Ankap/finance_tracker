@@ -181,13 +181,8 @@ const DashboardScreen = () => {
 
   // Calculate percentage changes for monthly snapshot
   // TODO: Replace dummy data with actual API data when available
-  const incomeChange = growth.incomeChange || 0;
-  const incomeChangePercentage = growth.incomeChangePercentage || 5.2; // Dummy data
-  const expenseChange = growth.expenseChange || 0;
-  const expenseChangePercentage = growth.expenseChangePercentage || -3.1; // Dummy data
+
   const savingsRateChange = growth.savingsRateChange || 2.5; // Dummy data
-  const savingsAmountChange = growth.savingsAmountChange || 0;
-  const savingsAmountChangePercentage = growth.savingsAmountChangePercentage || 8.7; // Dummy data
 
   // Helper function to render change indicator
   const renderChangeIndicator = (changePercentage, value = null) => {
