@@ -7,7 +7,6 @@ import Goals from './pages/Goals';
 import Expenses from './pages/Expenses';
 import UpdateData from './pages/UpdateData';
 import AISummary from './pages/AISummary';
-import './index.css';
 
 function App() {
   return (
