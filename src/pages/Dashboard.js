@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle, Lightbulb, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { CheckCircle, AlertCircle, Lightbulb, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus, ChevronRight, Plus } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { assetsAPI, snapshotsAPI, goalsAPI } from '../services/api';
-import { formatFullCurrency, formatCurrency } from '../utils/formatters';
+import { formatFullCurrency, formatCurrency, getGoalIcon } from '../utils/formatters';
 
 // --- Financial Health Score Calculation ---
 
@@ -83,10 +83,12 @@ const getStatusInfo = (score) => {
 // --- Component ---
 
 const DashboardScreen = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [snapshotData, setSnapshotData] = useState(null);
   const [goalsSummary, setGoalsSummary] = useState(null);
   const [netWorthData, setNetWorthData] = useState(null);
+  const [goals, setGoals] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [snapshots, setSnapshots] = useState([]);
   const [showHealthModal, setShowHealthModal] = useState(false);
@@ -109,16 +111,18 @@ const DashboardScreen = () => {
     const fetchData = async () => {
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
-        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes] = await Promise.all([
+        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes, allGoalsRes] = await Promise.all([
           snapshotsAPI.getLatest(),
           goalsAPI.getSummary(),
           assetsAPI.getNetWorth(),
           snapshotsAPI.getAll(startDate, endDate),
+          goalsAPI.getAll(),
         ]);
         setSnapshotData(snapshotRes.data);
         setGoalsSummary(goalsRes.data);
         setNetWorthData(netWorthRes.data);
         setSnapshots(snapshotsRes.data || []);
+        setGoals(allGoalsRes.data || []);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -210,8 +214,11 @@ const DashboardScreen = () => {
     );
   };
 
+  const completedGoals = goals.filter(g => g.status === 'Completed').length;
+
   return (
     <div className="space-y-8">
+
       {/* Financial Health Modal */}
       {showHealthModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -402,265 +409,301 @@ const DashboardScreen = () => {
         </div>
       )}
 
-      {/* Financial Health & Monthly Snapshot */}
-      <div className="bg-white rounded-2xl p-8 shadow-sm">
-        <div className="flex flex-col lg:flex-row items-start gap-8">
-          {/* Financial Health Score */}
-          <button
-            onClick={() => setShowHealthModal(true)}
-            className="flex items-center gap-6 hover:bg-gray-50 p-4 rounded-xl transition-colors cursor-pointer"
-          >
-            <div className="relative w-32 h-32">
-              <svg className="w-32 h-32 transform -rotate-90">
-                <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="12" fill="none" />
-                <circle cx="64" cy="64" r="56" stroke={status.ringColor} strokeWidth="12" fill="none" strokeDasharray={`${(healthScore/100)*352} 352`} strokeLinecap="round" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-gray-900">{healthScore}</span>
-                <span className="text-sm text-gray-500">/100</span>
-                <span className="text-xs text-gray-500 mt-1">{status.label}</span>
+      {/* Two-column outer layout: left stacks Health+Snapshot then Chart+Insights; right is Goals spanning full height */}
+      <div className="flex gap-6 items-stretch">
+
+        {/* Left: stacked rows */}
+        <div className="flex-1 flex flex-col gap-6 min-w-0">
+
+          {/* Financial Health + Monthly Snapshot */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm">
+            <div className="flex flex-col lg:flex-row items-start gap-8">
+              {/* Financial Health Score — unchanged */}
+              <button
+                onClick={() => setShowHealthModal(true)}
+                className="flex items-center gap-6 hover:bg-gray-50 p-4 rounded-xl transition-colors cursor-pointer flex-shrink-0"
+              >
+                <div className="relative w-32 h-32">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="12" fill="none" />
+                    <circle cx="64" cy="64" r="56" stroke={status.ringColor} strokeWidth="12" fill="none" strokeDasharray={`${(healthScore/100)*352} 352`} strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-bold text-gray-900">{healthScore}</span>
+                    <span className="text-sm text-gray-500">/100</span>
+                    <span className="text-xs text-gray-500 mt-1">{status.label}</span>
+                  </div>
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Financial Health: <span className={status.textColor}>{healthScore}/100</span></h3>
+                  <div className={`${status.color} text-white px-8 py-3 rounded-lg inline-block font-medium`}>{status.label}</div>
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                    <Info size={14} />
+                    Click to see how this is calculated
+                  </p>
+                </div>
+              </button>
+
+              <div className="hidden lg:block w-px bg-gray-200 self-stretch"></div>
+              <div className="lg:hidden w-full border-t border-gray-200"></div>
+
+              {/* Monthly Snapshot — tighter grid, left-aligned */}
+              <div className="flex flex-col justify-center flex-1">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-6 h-6 bg-teal-100 rounded flex items-center justify-center">
+                    <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Monthly Snapshot</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Income</p>
+                    <p className="font-semibold text-gray-900">{formatFullCurrency(income)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Expenses</p>
+                    <p className="font-semibold text-gray-900">{formatFullCurrency(expenses)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Savings Rate</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900">{savingsRate.toFixed(0)}%</p>
+                      {renderChangeIndicator(savingsRateChange)}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Savings</p>
+                    <p className="font-semibold text-gray-900">{formatFullCurrency(savingsAmount)}</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="text-left">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Financial Health: <span className={status.textColor}>{healthScore}/100</span></h3>
-              <div className={`${status.color} text-white px-8 py-3 rounded-lg inline-block font-medium`}>{status.label}</div>
-              <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-                <Info size={14} />
-                Click to see how this is calculated
-              </p>
+          </div>
+
+          {/* Net Worth Chart & Key Insights */}
+          <div className="grid grid-cols-2 gap-6 flex-1">
+
+            {/* Net Worth */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h2 className="text-4xl font-bold text-gray-900 mb-2">{formatFullCurrency(totalNetWorth)}</h2>
+                  <p className="text-gray-500 text-base">Total Net Worth</p>
+                </div>
+                <button className="p-2 hover:bg-gray-100 rounded-lg">
+                  <MoreVertical className="text-gray-400" size={20} />
+                </button>
+              </div>
+
+              <div className="relative h-40 mb-6">
+                {(() => {
+                  const { linePath, areaPath, points } = generateChartPath();
+                  if (!points.length) {
+                    return <div className="flex items-center justify-center h-full text-gray-400">No snapshot data for this period</div>;
+                  }
+                  return (
+                    <svg className="w-full h-full" viewBox="0 0 600 160">
+                      <defs>
+                        <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#86CCC5" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#86CCC5" stopOpacity="0.05" />
+                        </linearGradient>
+                      </defs>
+                      <path d={areaPath} fill="url(#areaGradient)" />
+                      <path d={linePath} fill="none" stroke="#5F9B95" strokeWidth="3" strokeLinecap="round" />
+                      {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill="#5F9B95" />)}
+                    </svg>
+                  );
+                })()}
+                {growth.netWorthChange >= 0 && (
+                  <div className="absolute top-2 right-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm flex items-center gap-2">
+                    <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    <span className="text-xs text-gray-700">
+                      {growth.netWorthChange > 0 ? `+${formatCurrency(growth.netWorthChange)}` : 'Highest!'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 mb-4">
+                {['1M', '3M', '6M', '1Y', 'All'].map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => handlePeriodChange(period)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                      selectedPeriod === period ? 'bg-teal-600 text-white' : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+
+              <Link to="/wealth" className="flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group">
+                <span>View all assets</span>
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
-          </button>
 
-          {/* Divider */}
-          <div className="hidden lg:block w-px bg-gray-200 self-stretch"></div>
-          <div className="lg:hidden w-full border-t border-gray-200"></div>
-
-          {/* Monthly Snapshot */}
-          <div className="flex-1 w-full flex flex-col">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-6 h-6 bg-teal-100 rounded flex items-center justify-center">
-                <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+            {/* Key Insights */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Lightbulb className="text-gray-700" size={24} />
+                <h3 className="text-xl font-semibold text-gray-900">Key Insights</h3>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Monthly Snapshot</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const insights = [];
+                  if (growth.netWorthChange !== 0) {
+                    insights.push(
+                      <div key="networth" className="flex items-start gap-3">
+                        <div className={`w-8 h-8 ${growth.netWorthChange >= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                          {growth.netWorthChange >= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            Net worth {growth.netWorthChange >= 0 ? 'increased' : 'decreased'} by <span className="font-semibold">{formatCurrency(Math.abs(growth.netWorthChange))}</span>
+                            {growth.netWorthChangePercentage ? ` (${growth.netWorthChangePercentage > 0 ? '+' : ''}${growth.netWorthChangePercentage.toFixed(1)}%)` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (growth.expenseChange !== 0) {
+                    insights.push(
+                      <div key="expense" className="flex items-start gap-3">
+                        <div className={`w-8 h-8 ${growth.expenseChange <= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                          {growth.expenseChange <= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            Expenses were <span className="font-semibold">{formatCurrency(Math.abs(growth.expenseChange))}</span> {growth.expenseChange > 0 ? 'higher' : 'lower'} than last month
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  insights.push(
+                    <div key="savings" className="flex items-start gap-3">
+                      <div className={`w-8 h-8 ${savingsRate >= 30 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        {savingsRate >= 30 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900">
+                          {savingsRate >= 30 ? `Great job! Saving ${savingsRate.toFixed(0)}% of income this month.` : `Savings rate is ${savingsRate.toFixed(0)}%. Aim for at least 30%.`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                  if (goalsSummary && goalsSummary.behind > 0) {
+                    insights.push(
+                      <div key="goals" className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <AlertCircle className="text-orange-500" size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">{goalsSummary.behind} of {goalsSummary.total} goals behind schedule</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const assetTypes = Object.keys(netWorthData?.breakdown || {}).length;
+                  insights.push(
+                    <div key="diversification" className="flex items-start gap-3">
+                      <div className={`w-8 h-8 ${assetTypes >= 5 ? 'bg-teal-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                        <CheckCircle className={assetTypes >= 5 ? 'text-teal-600' : 'text-blue-600'} size={16} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900">
+                          {assetTypes >= 5 ? `Excellent diversification across ${assetTypes} asset types` : `Portfolio spread across ${assetTypes} asset type${assetTypes !== 1 ? 's' : ''}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                  return insights.slice(0, 5);
+                })()}
+              </div>
+              <Link to="/ai-summary" className="mt-6 flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group">
+                <span>View all insights</span>
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-5 flex-1 content-center">
-              {/* Income */}
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm">Income:</span>
-                <span className="font-semibold text-gray-900">{formatFullCurrency(income)}</span>
-              </div>
 
-              {/* Expenses */}
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm">Expenses:</span>
-                <span className="font-semibold text-gray-900">{formatFullCurrency(expenses)}</span>
-              </div>
-
-              {/* Savings Rate */}
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm">Savings Rate:</span>
-                <span className="font-semibold text-gray-900">{savingsRate.toFixed(0)}%</span>
-                {renderChangeIndicator(savingsRateChange)}
-              </div>
-
-              {/* Savings */}
-              <div className="flex items-center gap-2">
-                <span className="text-gray-600 text-sm">Savings:</span>
-                <span className="font-semibold text-gray-900">{formatFullCurrency(savingsAmount)}</span>
-              </div>
-            </div>
           </div>
         </div>
-      </div>
 
-      {/* Net Worth Chart & Key Insights - Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Net Worth Card with Chart - Left Half */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-4xl font-bold text-gray-900 mb-2">{formatFullCurrency(totalNetWorth)}</h2>
-                <p className="text-gray-500 text-base">Total Net Worth</p>
-              </div>
-              <button className="p-2 hover:bg-gray-100 rounded-lg">
-                <MoreVertical className="text-gray-400" size={20} />
+        {/* Right: Goals — spans the full height of both left rows */}
+        <div className="w-72 flex-shrink-0 bg-white rounded-2xl p-8 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-gray-900">Goals</h3>
+            <span className="text-sm text-gray-400">{completedGoals}/{goals.length} done</span>
+          </div>
+
+          {goals.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-2">
+              <p className="text-sm text-gray-500">No goals set yet</p>
+              <button onClick={() => navigate('/goals')} className="text-sm text-teal-600 hover:underline">
+                Add your first goal →
               </button>
             </div>
+          ) : (
+            <div className="space-y-5 flex-1">
+              {goals.map((goal) => {
+                const dotColor = {
+                  Completed:  'bg-green-500',
+                  Ahead:      'bg-teal-500',
+                  'On Track': 'bg-blue-500',
+                }[goal.status] || 'bg-orange-400';
 
-            {/* Chart */}
-            <div className="relative h-40 mb-6">
-              {(() => {
-                const { linePath, areaPath, points } = generateChartPath();
-                if (!points.length) {
-                  return (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      No snapshot data for this period
-                    </div>
-                  );
-                }
+                const barColor = {
+                  Completed:  'bg-green-500',
+                  Ahead:      'bg-teal-500',
+                  'On Track': 'bg-blue-500',
+                }[goal.status] || 'bg-orange-400';
+
+                const progress = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+
+                const remaining = goal.targetAmount - goal.currentAmount;
+
                 return (
-                  <svg className="w-full h-full" viewBox="0 0 600 160">
-                    <defs>
-                      <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#86CCC5" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#86CCC5" stopOpacity="0.05" />
-                      </linearGradient>
-                    </defs>
-                    <path d={areaPath} fill="url(#areaGradient)" />
-                    <path d={linePath} fill="none" stroke="#5F9B95" strokeWidth="3" strokeLinecap="round" />
-                    {points.map((p, i) => (
-                      <circle key={i} cx={p.x} cy={p.y} r="4" fill="#5F9B95" />
-                    ))}
-                  </svg>
+                  <button
+                    key={goal._id}
+                    onClick={() => navigate('/goals')}
+                    className="w-full flex items-start gap-3 group hover:bg-gray-50 rounded-xl px-3 py-2 -mx-3 transition-colors text-left"
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5 ${dotColor}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-sm font-medium text-gray-900 truncate">{goal.name}</p>
+                        <span className="text-xs font-semibold text-gray-500 flex-shrink-0 ml-2">{progress.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5 mb-1.5">
+                        <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${progress}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{formatCurrency(goal.currentAmount, true)} saved</span>
+                        {remaining > 0
+                          ? <span className="text-xs text-gray-400">{formatCurrency(remaining, true)} left</span>
+                          : <span className="text-xs text-green-600 font-medium">Completed!</span>
+                        }
+                      </div>
+                    </div>
+                  </button>
                 );
-              })()}
-              {growth.netWorthChange >= 0 && (
-                <div className="absolute top-2 right-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm flex items-center gap-2">
-                  <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                  <span className="text-xs text-gray-700">
-                    {growth.netWorthChange > 0 ? `+${formatCurrency(growth.netWorthChange)}` : 'Highest!'}
-                  </span>
-                </div>
-              )}
+              })}
             </div>
+          )}
 
-            {/* Time Periods */}
-            <div className="flex items-center justify-center gap-2 mb-4">
-              {['1M', '3M', '6M', '1Y', 'All'].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => handlePeriodChange(period)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                    selectedPeriod === period
-                      ? 'bg-teal-600 text-white'
-                      : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
+          <Link to="/goals" className="mt-6 flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group">
+            <span>View all goals</span>
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
 
-            {/* View Assets Link */}
-            <Link
-              to="/wealth"
-              className="flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group"
-            >
-              <span>View all assets</span>
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
-
-          {/* Key Insights - Right Half */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm">
-            <div className="flex items-center gap-2 mb-6">
-              <Lightbulb className="text-gray-700" size={24} />
-              <h3 className="text-xl font-semibold text-gray-900">Key Insights</h3>
-            </div>
-            <div className="space-y-3">
-              {(() => {
-                const insights = [];
-
-                // Insight 1: Net Worth Change
-                if (growth.netWorthChange !== 0) {
-                  insights.push(
-                    <div key="networth" className="flex items-start gap-3">
-                      <div className={`w-8 h-8 ${growth.netWorthChange >= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                        {growth.netWorthChange >= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          Net worth {growth.netWorthChange >= 0 ? 'increased' : 'decreased'} by <span className="font-semibold">{formatCurrency(Math.abs(growth.netWorthChange))}</span>
-                          {growth.netWorthChangePercentage ? ` (${growth.netWorthChangePercentage > 0 ? '+' : ''}${growth.netWorthChangePercentage.toFixed(1)}%)` : ''}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Insight 2: Expense Change
-                if (growth.expenseChange !== 0) {
-                  insights.push(
-                    <div key="expense" className="flex items-start gap-3">
-                      <div className={`w-8 h-8 ${growth.expenseChange <= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                        {growth.expenseChange <= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          Expenses were <span className="font-semibold">{formatCurrency(Math.abs(growth.expenseChange))}</span> {growth.expenseChange > 0 ? 'higher' : 'lower'} than last month
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Insight 3: Savings Rate
-                insights.push(
-                  <div key="savings" className="flex items-start gap-3">
-                    <div className={`w-8 h-8 ${savingsRate >= 30 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                      {savingsRate >= 30 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        {savingsRate >= 30
-                          ? `Great job! Saving ${savingsRate.toFixed(0)}% of income this month.`
-                          : `Savings rate is ${savingsRate.toFixed(0)}%. Aim for at least 30%.`}
-                      </p>
-                    </div>
-                  </div>
-                );
-
-                // Insight 4: Goals Behind
-                if (goalsSummary && goalsSummary.behind > 0) {
-                  insights.push(
-                    <div key="goals" className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <AlertCircle className="text-orange-500" size={16} />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          {goalsSummary.behind} of {goalsSummary.total} goals behind schedule
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Insight 5: Asset Diversification
-                const assetTypes = Object.keys(netWorthData?.breakdown || {}).length;
-                insights.push(
-                  <div key="diversification" className="flex items-start gap-3">
-                    <div className={`w-8 h-8 ${assetTypes >= 5 ? 'bg-teal-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                      <CheckCircle className={assetTypes >= 5 ? 'text-teal-600' : 'text-blue-600'} size={16} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        {assetTypes >= 5
-                          ? `Excellent diversification across ${assetTypes} asset types`
-                          : `Portfolio spread across ${assetTypes} asset type${assetTypes !== 1 ? 's' : ''}`}
-                      </p>
-                    </div>
-                  </div>
-                );
-
-                // Show max 5 insights
-                return insights.slice(0, 5);
-              })()}
-            </div>
-
-            {/* View All Link */}
-            <Link
-              to="/ai-summary"
-              className="mt-6 flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group"
-            >
-              <span>View all insights</span>
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
       </div>
     </div>
   );
