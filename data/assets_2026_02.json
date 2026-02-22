@@ -1,0 +1,27 @@
+{
+  "year": 2026,
+  "month": 2,
+  "date": "2026-02",
+  "lastUpdated": "2026-02-22T14:20:31.933Z",
+  "assets": [
+    {
+      "_id": "1771769984378",
+      "name": "Gold",
+      "currentValue": 457654,
+      "owner": "Nidhi",
+      "accountDetails": "",
+      "monthlySnapshots": [
+        {
+          "value": 110000,
+          "returnPercentage": 0,
+          "date": "2026-02-22T14:19:44.378Z"
+        },
+        {
+          "value": 457654,
+          "returnPercentage": 7,
+          "date": "2026-02-22T14:20:31.933Z"
+        }
+      ]
+    }
+  ]
+}

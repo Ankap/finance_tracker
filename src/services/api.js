@@ -213,19 +213,60 @@ const wealthInsights = {
   ],
 };
 
-// Mock API that returns static data wrapped in { data: ... } to match axios response format
+// Helpers for asset API calls that read/write JSON files via Next.js API routes
+
+async function fetchAssetsFromFile(owner = null) {
+  try {
+    const res = await fetch('/api/assets');
+    if (!res.ok) throw new Error('API unavailable');
+    const json = await res.json();
+    const assets = json.data;
+    return owner ? assets.filter(a => a.owner === owner) : assets;
+  } catch {
+    // Fallback to static data if the API route is unreachable
+    return owner ? staticAssets.filter(a => a.owner === owner) : staticAssets;
+  }
+}
+
+async function postToAssetsAPI(body) {
+  try {
+    const res = await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  } catch {
+    return { data: { success: true } };
+  }
+}
 
 export const assetsAPI = {
-  getAll: (owner = null) => {
-    const filtered = owner ? staticAssets.filter(a => a.owner === owner) : staticAssets;
-    return Promise.resolve({ data: filtered });
+  getAll: async (owner = null) => {
+    const assets = await fetchAssetsFromFile(owner);
+    return { data: assets };
   },
   getById: (id) => Promise.resolve({ data: staticAssets.find(a => a._id === id) }),
-  create: () => Promise.resolve({ data: { success: true } }),
+  create: (assetData) => postToAssetsAPI({ action: 'create', ...assetData }),
   update: () => Promise.resolve({ data: { success: true } }),
   delete: () => Promise.resolve({ data: { success: true } }),
-  addSnapshot: () => Promise.resolve({ data: { success: true } }),
-  getNetWorth: () => Promise.resolve({ data: netWorthData }),
+  addSnapshot: (assetId, snapshot) =>
+    postToAssetsAPI({ action: 'addSnapshot', assetId, ...snapshot }),
+  getNetWorth: async (owner = null) => {
+    try {
+      const assets = await fetchAssetsFromFile(owner);
+      const totalNetWorth = assets.reduce((sum, a) => sum + a.currentValue, 0);
+      const breakdown = {};
+      assets.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + a.currentValue; });
+      return { data: { totalNetWorth, breakdown } };
+    } catch {
+      const filtered = owner ? staticAssets.filter(a => a.owner === owner) : staticAssets;
+      const totalNetWorth = filtered.reduce((sum, a) => sum + a.currentValue, 0);
+      const breakdown = {};
+      filtered.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + a.currentValue; });
+      return { data: { totalNetWorth, breakdown } };
+    }
+  },
 };
 
 export const goalsAPI = {

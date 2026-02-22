@@ -17,7 +17,7 @@ const WealthOverview = () => {
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
       const [assetsRes, netWorthRes, insightsRes] = await Promise.all([
         assetsAPI.getAll(ownerFilter),
-        assetsAPI.getNetWorth(),
+        assetsAPI.getNetWorth(ownerFilter),
         insightsAPI.getWealthInsights(),
       ]);
       setAssets(assetsRes.data);

@@ -1,0 +1,64 @@
+{
+  "year": 2026,
+  "month": 1,
+  "date": "2026-01",
+  "lastUpdated": "2026-01-31T00:00:00.000Z",
+  "assets": [
+    {
+      "_id": "1771769407048",
+      "name": "Mutual Funds",
+      "currentValue": 100000,
+      "owner": "Joint",
+      "accountDetails": "",
+      "monthlySnapshots": [
+        {
+          "value": 100000,
+          "returnPercentage": 0,
+          "date": "2026-01-31T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "1771769415469",
+      "name": "Mutual Funds",
+      "currentValue": 500000,
+      "owner": "Anurag",
+      "accountDetails": "",
+      "monthlySnapshots": [
+        {
+          "value": 500000,
+          "returnPercentage": 0,
+          "date": "2026-01-31T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "1771769440071",
+      "name": "Fixed Deposits",
+      "currentValue": 700000,
+      "owner": "Joint",
+      "accountDetails": "",
+      "monthlySnapshots": [
+        {
+          "value": 700000,
+          "returnPercentage": 0,
+          "date": "2026-01-31T00:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "_id": "1771769459808",
+      "name": "Fixed Deposits",
+      "currentValue": 150000,
+      "owner": "Nidhi",
+      "accountDetails": "",
+      "monthlySnapshots": [
+        {
+          "value": 150000,
+          "returnPercentage": 0,
+          "date": "2026-01-31T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}
