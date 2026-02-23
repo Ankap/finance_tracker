@@ -145,7 +145,7 @@ const AISummary = () => {
             <div className="flex-1">
               <h3 className="font-semibold text-gray-900 mb-1">Savings Performance</h3>
               <p className="text-gray-700">
-                You're saving <span className="font-semibold">{savingsRate.toFixed(0)}%</span> of your income this month, which amounts to <span className="font-semibold">{formatFullCurrency(savingsAmount)}</span>.
+                You&apos;re saving <span className="font-semibold">{savingsRate.toFixed(0)}%</span> of your income this month, which amounts to <span className="font-semibold">{formatFullCurrency(savingsAmount)}</span>.
               </p>
               <p className="text-sm text-gray-500 mt-2">
                 {savingsRate >= 50
