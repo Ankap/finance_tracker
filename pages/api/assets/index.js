@@ -1,7 +1,6 @@
+import { kv } from '@vercel/kv';
 import fs from 'fs';
 import path from 'path';
-
-const dataDir = path.join(process.cwd(), 'data');
 
 function getCurrentMonthKey() {
   const now = new Date();
@@ -18,80 +17,95 @@ function getPreviousMonthKey() {
   return `${year}_${month}`;
 }
 
-function getSortedFiles() {
-  if (!fs.existsSync(dataDir)) return [];
-  return fs.readdirSync(dataDir)
-    .filter(f => f.startsWith('assets_') && f.endsWith('.json'))
-    .sort();
+async function getSortedKeys() {
+  const keys = await kv.keys('assets:*');
+  return keys.sort();
 }
 
-function readFileData(monthKey) {
-  const filePath = path.join(dataDir, `assets_${monthKey}.json`);
-  if (!fs.existsSync(filePath)) return null;
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+async function readMonthData(monthKey) {
+  return await kv.get(`assets:${monthKey}`);
 }
 
-// Aggregate assets across ALL monthly files — later months overwrite earlier ones
-// so each asset reflects its most recently updated value.
-function getAllAssetsAggregated() {
-  const files = getSortedFiles();
+// Aggregate assets across ALL monthly KV entries — later months overwrite earlier ones.
+async function getAllAssetsAggregated() {
+  const keys = await getSortedKeys();
   const assetMap = {};
-  for (const file of files) {
-    const data = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8'));
-    for (const asset of data.assets) {
-      assetMap[asset._id] = asset;
+  for (const key of keys) {
+    const data = await kv.get(key);
+    if (data && data.assets) {
+      for (const asset of data.assets) {
+        assetMap[asset._id] = asset;
+      }
     }
   }
   return Object.values(assetMap);
 }
 
-function getCurrentMonthFilePath() {
-  return path.join(dataDir, `assets_${getCurrentMonthKey()}.json`);
+// On first deployment, seed KV from the bundled read-only JSON files in /data.
+async function seedAllFromFiles() {
+  const dataDir = path.join(process.cwd(), 'data');
+  try {
+    if (!fs.existsSync(dataDir)) return;
+    const files = fs.readdirSync(dataDir)
+      .filter(f => f.startsWith('assets_') && f.endsWith('.json'))
+      .sort();
+    for (const file of files) {
+      const monthKey = file.replace('assets_', '').replace('.json', '');
+      const data = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8'));
+      await kv.set(`assets:${monthKey}`, data);
+    }
+  } catch (e) {
+    console.error('Seed error:', e);
+  }
 }
 
-// Get or create the current month's file — starts with EMPTY assets.
-// Previous months' assets are NOT copied; the GET endpoint aggregates across files.
-function getOrCreateCurrentMonthData() {
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+// Get or create the current month's KV entry.
+async function getOrCreateCurrentMonthData() {
+  const monthKey = getCurrentMonthKey();
+  let data = await kv.get(`assets:${monthKey}`);
+
+  if (!data) {
+    // Try to seed from the bundled JSON file first (handles initial migration).
+    const filePath = path.join(process.cwd(), 'data', `assets_${monthKey}.json`);
+    if (fs.existsSync(filePath)) {
+      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      const now = new Date();
+      data = {
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+        lastUpdated: now.toISOString(),
+        assets: [],
+      };
+    }
+    await kv.set(`assets:${monthKey}`, data);
   }
 
-  const currentFilePath = getCurrentMonthFilePath();
-
-  if (fs.existsSync(currentFilePath)) {
-    return JSON.parse(fs.readFileSync(currentFilePath, 'utf8'));
-  }
-
-  const now = new Date();
-  const newData = {
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-    date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-    lastUpdated: now.toISOString(),
-    assets: [],
-  };
-
-  fs.writeFileSync(currentFilePath, JSON.stringify(newData, null, 2));
-  return newData;
+  return data;
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      // Return all assets aggregated from every monthly file
-      const assets = getAllAssetsAggregated();
+      // Auto-seed from bundled JSON files on first deployment (KV is empty).
+      const keys = await getSortedKeys();
+      if (keys.length === 0) {
+        await seedAllFromFiles();
+      }
+      const assets = await getAllAssetsAggregated();
       return res.status(200).json({ data: assets });
     }
 
     if (req.method === 'POST') {
       const { action, assetId, value, returnPercentage, name, currentValue, owner } = req.body;
 
-      const fileData = getOrCreateCurrentMonthData();
-      const currentFilePath = getCurrentMonthFilePath();
+      const monthKey = getCurrentMonthKey();
+      const fileData = await getOrCreateCurrentMonthData();
 
       if (action === 'addSnapshot') {
-        // Calculate returnPercentage by comparing to the previous month's value
-        const prevMonthData = readFileData(getPreviousMonthKey());
+        // Calculate returnPercentage by comparing to the previous month's value.
+        const prevMonthData = await readMonthData(getPreviousMonthKey());
         let calcReturn = returnPercentage || 0;
         if (prevMonthData) {
           const prevAsset = prevMonthData.assets.find(a => a._id === assetId);
@@ -102,15 +116,15 @@ export default function handler(req, res) {
 
         const idx = fileData.assets.findIndex(a => a._id === assetId);
         if (idx >= 0) {
-          // Asset already in current month file — update it
+          // Asset already in current month entry — update it.
           fileData.assets[idx].currentValue = value;
           fileData.assets[idx].monthlySnapshots = [
             ...(fileData.assets[idx].monthlySnapshots || []),
             { value, returnPercentage: calcReturn, date: new Date().toISOString() },
           ];
         } else {
-          // Asset not in current month file yet — pull its metadata from the aggregated history
-          const allAssets = getAllAssetsAggregated();
+          // Asset not in current month yet — pull metadata from the aggregated history.
+          const allAssets = await getAllAssetsAggregated();
           const existing = allAssets.find(a => a._id === assetId);
           if (existing) {
             fileData.assets.push({
@@ -136,7 +150,7 @@ export default function handler(req, res) {
       }
 
       fileData.lastUpdated = new Date().toISOString();
-      fs.writeFileSync(currentFilePath, JSON.stringify(fileData, null, 2));
+      await kv.set(`assets:${monthKey}`, fileData);
 
       return res.status(200).json({ data: { success: true } });
     }
@@ -144,6 +158,6 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('Assets API error:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 }
