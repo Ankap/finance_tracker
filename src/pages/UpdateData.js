@@ -53,6 +53,9 @@ const UpdateData = () => {
         });
       }
 
+      // Mark AI insights as stale so they regenerate on next visit
+      localStorage.setItem('ai_insights_stale', 'true');
+
       setSuccess(true);
       setAssetForm({
         name: 'Mutual Funds',

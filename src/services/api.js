@@ -270,13 +270,39 @@ export const assetsAPI = {
 };
 
 export const goalsAPI = {
-  getAll: () => Promise.resolve({ data: staticGoals }),
-  getById: (id) => Promise.resolve({ data: staticGoals.find(g => g._id === id) }),
-  create: () => Promise.resolve({ data: { success: true } }),
-  update: () => Promise.resolve({ data: { success: true } }),
-  delete: () => Promise.resolve({ data: { success: true } }),
-  addProgress: () => Promise.resolve({ data: { success: true } }),
-  getSummary: () => Promise.resolve({ data: goalsSummary }),
+  getAll: async () => {
+    try {
+      const res = await fetch('/api/goals');
+      if (!res.ok) throw new Error('API unavailable');
+      return res.json();
+    } catch {
+      return { data: [] };
+    }
+  },
+  create: async (goal) => {
+    const res = await fetch('/api/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', goal }),
+    });
+    return res.json();
+  },
+  update: async (goal) => {
+    const res = await fetch('/api/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', goal }),
+    });
+    return res.json();
+  },
+  delete: async (id) => {
+    const res = await fetch('/api/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }),
+    });
+    return res.json();
+  },
 };
 
 export const transactionsAPI = {

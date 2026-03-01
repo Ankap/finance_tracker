@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import Image from 'next/image';
 import { Home, TrendingUp, Target, IndianRupee, Upload, X, Sparkles } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -24,9 +25,11 @@ const Layout = ({ children }) => {
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3 no-underline">
               {/* Photo Logo */}
-              <img
+              <Image
                 src="/photo.jpeg"
                 alt="Anurag & Nidhi"
+                width={40}
+                height={40}
                 className="w-10 h-10 rounded-xl object-cover shadow-sm border border-sage-200 transition-all duration-300 hover:scale-125 hover:shadow-lg hover:rounded-2xl cursor-pointer"
                 onClick={(e) => {
                   e.preventDefault();
@@ -101,10 +104,12 @@ const Layout = ({ children }) => {
           onClick={() => setShowEnlarged(false)}
         >
           <div className="relative animate-scaleIn">
-            <img
+            <Image
               src="/photo.jpeg"
               alt="Anurag & Nidhi"
-              className="max-w-sm w-80 h-80 object-cover rounded-2xl shadow-2xl border-4 border-white"
+              width={320}
+              height={320}
+              className="w-80 h-80 object-cover rounded-2xl shadow-2xl border-4 border-white"
             />
             <button
               onClick={() => setShowEnlarged(false)}
