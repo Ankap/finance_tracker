@@ -99,4 +99,13 @@ app.delete('/assets/:id', (req, res) => {
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-app.listen(PORT, () => console.log(`Save-asset server listening on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Save-asset server listening on port ${PORT}`));
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`Port ${PORT} is already in use. Server may already be running.`);
+    process.exit(0);
+  } else {
+    throw err;
+  }
+});

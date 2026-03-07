@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import Image from 'next/image';
 import { Home, TrendingUp, Target, IndianRupee, Upload, X, Sparkles } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const [showEnlarged, setShowEnlarged] = useState(false);
+  const [showGhibli, setShowGhibli] = useState(false);
+  const [ghibliMissing, setGhibliMissing] = useState(false);
 
   const navItems = [
     { path: '/', label: 'Overview', icon: Home },
@@ -25,14 +26,13 @@ const Layout = ({ children }) => {
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3 no-underline">
               {/* Photo Logo */}
-              <Image
+              <img
                 src="/photo.jpeg"
                 alt="Anurag & Nidhi"
-                width={40}
-                height={40}
                 className="w-10 h-10 rounded-xl object-cover shadow-sm border border-sage-200 transition-all duration-300 hover:scale-125 hover:shadow-lg hover:rounded-2xl cursor-pointer"
                 onClick={(e) => {
                   e.preventDefault();
+                  setShowGhibli(false);
                   setShowEnlarged(true);
                 }}
               />
@@ -100,17 +100,40 @@ const Layout = ({ children }) => {
       {/* Enlarged Photo Modal */}
       {showEnlarged && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-center justify-center cursor-pointer"
+          className="fixed inset-0 bg-black bg-opacity-70 z-[100] flex items-center justify-center"
           onClick={() => setShowEnlarged(false)}
         >
-          <div className="relative animate-scaleIn">
-            <Image
-              src="/photo.jpeg"
-              alt="Anurag & Nidhi"
-              width={320}
-              height={320}
-              className="w-80 h-80 object-cover rounded-2xl shadow-2xl border-4 border-white"
-            />
+          <div className="relative animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            {/* Toggle tabs */}
+            <div className="flex mb-3 bg-white bg-opacity-10 rounded-xl p-1 gap-1">
+              <button
+                onClick={() => setShowGhibli(false)}
+                className={`flex-1 py-1.5 px-4 rounded-lg text-sm font-semibold transition-all ${!showGhibli ? 'bg-white text-gray-800 shadow' : 'text-white hover:bg-white hover:bg-opacity-10'}`}
+              >
+                Original
+              </button>
+              <button
+                onClick={() => { setGhibliMissing(false); setShowGhibli(true); }}
+                className={`flex-1 py-1.5 px-4 rounded-lg text-sm font-semibold transition-all ${showGhibli ? 'bg-white text-gray-800 shadow' : 'text-white hover:bg-white hover:bg-opacity-10'}`}
+              >
+                ✦ Ghibli
+              </button>
+            </div>
+            {showGhibli && ghibliMissing ? (
+              <div style={{ width: 480, height: 480, background: "rgba(255,255,255,0.08)", borderRadius: 16, border: "2px dashed rgba(255,255,255,0.3)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", gap: 12 }}>
+                <div style={{ fontSize: 48 }}>🎨</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>Ghibli photo not found</div>
+                <div style={{ fontSize: 13, opacity: 0.7, textAlign: "center", maxWidth: 300 }}>Add your Ghibli version at<br /><code style={{ background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 4 }}>public/photo-ghibli.jpeg</code></div>
+              </div>
+            ) : (
+              <img
+                src={showGhibli ? "/photo-ghibli.jpeg" : "/photo.jpeg"}
+                alt="Anurag & Nidhi"
+                style={{ width: 480, height: 480 }}
+                className="object-cover rounded-2xl shadow-2xl border-4 border-white"
+                onError={() => { if (showGhibli) setGhibliMissing(true); }}
+              />
+            )}
             <button
               onClick={() => setShowEnlarged(false)}
               className="absolute -top-3 -right-3 bg-white rounded-full p-1 shadow-lg hover:bg-gray-100 transition-colors"
