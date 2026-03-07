@@ -26,7 +26,7 @@ export function IncomeEditModal({ month, income, onSave, onClose }) {
           { person: "Nidhi",  sk: "nidhiSalary",  bk: "nidhiBonus",  acct: "nidhi"  },
         ].map(({ person, sk, bk, acct }) => (
           <div key={person} style={{ background: ACCT_STYLES[acct].bg, border: `1px solid ${ACCT_STYLES[acct].border}`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
-            <div style={{ fontWeight: 600, fontSize: 14, color: ACCT_STYLES[acct].color, marginBottom: 12 }}>{person}'s Income</div>
+            <div style={{ fontWeight: 600, fontSize: 14, color: ACCT_STYLES[acct].color, marginBottom: 12 }}>{person}&apos;s Income</div>
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Monthly Salary (₹)</label>
