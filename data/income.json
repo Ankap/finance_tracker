@@ -1,0 +1,10 @@
+{
+  "anurag": { "salary": 220000 },
+  "nidhi":  { "salary": 150000 },
+  "sips": 45000,
+  "fixedExpenses": [
+    { "id": "fe1", "label": "Home Loan EMI", "amount": 35000 },
+    { "id": "fe2", "label": "Car Insurance", "amount": 4500  }
+  ],
+  "lastUpdated": "2026-03-08T00:00:00.000Z"
+}

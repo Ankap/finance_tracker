@@ -2,8 +2,108 @@ import React, { useState } from 'react';
 import { AccountPill, TrendBadge } from './Primitives';
 import { ACCT_STYLES, ACCT_LABEL, fmt } from '../../lib/expenses.types';
 
-function CategoryList({ categories, filter, setFilter, onClose }) {
+const ICONS = ["🏠","🛍️","🛒","🛡️","⛽","💡","🍽️","🎁","📱","✈️","🏥","🎓","🚗","💊","🎬","🏋️","🍕","☕","🐾","🌐"];
+
+function CategoryModal({ cat, onSave, onClose, totalAmount }) {
+  const [vals, setVals] = useState({
+    name:    cat?.name    || "",
+    icon:    cat?.icon    || "🛒",
+    account: cat?.account || "joint",
+    amount:  cat?.amount  || 0,
+    txns:    cat?.txns    || 1,
+    trend:   cat?.trend   || 0,
+  });
+
+  const save = () => {
+    if (!vals.name.trim() || !vals.amount) return;
+    const newTotal = totalAmount - (cat?.amount || 0) + Number(vals.amount);
+    const pct = newTotal > 0 ? parseFloat(((Number(vals.amount) / newTotal) * 100).toFixed(1)) : 0;
+    onSave({ ...vals, amount: Number(vals.amount), txns: Number(vals.txns) || 1, trend: Number(vals.trend) || 0, pct });
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440, boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#111827" }}>{cat ? "Edit Category" : "Add Category"}</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>✕</button>
+        </div>
+
+        {/* Icon picker */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 6 }}>Icon</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {ICONS.map(ic => (
+              <button key={ic} onClick={() => setVals(p => ({ ...p, icon: ic }))} style={{ fontSize: 18, width: 36, height: 36, borderRadius: 8, border: `2px solid ${vals.icon === ic ? "#3d6b4f" : "#e5e7eb"}`, background: vals.icon === ic ? "#f0faf4" : "#fff", cursor: "pointer" }}>{ic}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 2 }}>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Category Name</label>
+            <input value={vals.name} onChange={e => setVals(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Groceries" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Amount (₹)</label>
+            <input type="number" value={vals.amount} onChange={e => setVals(p => ({ ...p, amount: e.target.value }))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 6 }}>Account</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["joint", "anurag", "nidhi"].map(o => (
+              <button key={o} onClick={() => setVals(p => ({ ...p, account: o }))} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `1px solid ${vals.account === o ? ACCT_STYLES[o].color : "#e5e7eb"}`, background: vals.account === o ? ACCT_STYLES[o].bg : "#fff", color: vals.account === o ? ACCT_STYLES[o].color : "#6b7280", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {ACCT_LABEL[o]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Transactions</label>
+            <input type="number" value={vals.txns} onChange={e => setVals(p => ({ ...p, txns: e.target.value }))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>MoM Trend (%)</label>
+            <input type="number" value={vals.trend} onChange={e => setVals(p => ({ ...p, trend: e.target.value }))} placeholder="0 = no change" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Cancel</button>
+          <button onClick={save} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: "#3d6b4f", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer" }}>{cat ? "Save Changes" : "Add Category"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function recalcPct(cats) {
+  const total = cats.reduce((s, c) => s + c.amount, 0);
+  return cats.map(c => ({ ...c, pct: total > 0 ? parseFloat(((c.amount / total) * 100).toFixed(1)) : 0 }));
+}
+
+function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChange }) {
+  const [editingCat, setEditingCat] = useState(null); // null | "new" | cat object
   const filtered = filter === "all" ? categories : categories.filter(c => c.account === filter);
+  const totalAmount = categories.reduce((s, c) => s + c.amount, 0);
+
+  const handleSave = (saved) => {
+    let updated;
+    if (editingCat === "new") {
+      updated = [...categories, { ...saved, name: saved.name }];
+    } else {
+      updated = categories.map(c => c.name === editingCat.name ? { ...c, ...saved } : c);
+    }
+    onCategoriesChange(recalcPct(updated));
+  };
+
+  const handleDelete = (name) => onCategoriesChange(recalcPct(categories.filter(c => c.name !== name)));
+
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
@@ -14,9 +114,8 @@ function CategoryList({ categories, filter, setFilter, onClose }) {
               {f === "all" ? "All" : ACCT_LABEL[f]}
             </button>
           ))}
-          {onClose && (
-            <button onClick={onClose} title="Close" style={{ fontSize: 18, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#9ca3af", marginLeft: 4, padding: "2px 6px" }}>✕</button>
-          )}
+          <button onClick={() => setEditingCat("new")} style={{ fontSize: 12, fontWeight: 600, color: "#3d6b4f", background: "#f0faf4", border: "1px solid #bbf0d0", borderRadius: 20, padding: "4px 12px", cursor: "pointer" }}>+ Add</button>
+          {onClose && <button onClick={onClose} title="Close" style={{ fontSize: 18, lineHeight: 1, background: "none", border: "none", cursor: "pointer", color: "#9ca3af", marginLeft: 4, padding: "2px 6px" }}>✕</button>}
         </div>
       </div>
       <div style={{ overflowY: "auto", flex: 1 }}>
@@ -37,20 +136,28 @@ function CategoryList({ categories, filter, setFilter, onClose }) {
               <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{fmt(cat.amount)}</div>
               <div style={{ fontSize: 12, color: "#9ca3af" }}>{cat.txns} txn{cat.txns !== 1 ? "s" : ""} · {cat.pct}%</div>
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <button onClick={() => setEditingCat(cat)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#9ca3af", padding: "2px 4px" }}>✎</button>
+              <button onClick={() => handleDelete(cat.name)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ef4444", padding: "2px 4px" }}>✕</button>
+            </div>
           </div>
         ))}
       </div>
+      {editingCat !== null && (
+        <CategoryModal
+          cat={editingCat === "new" ? null : editingCat}
+          totalAmount={totalAmount}
+          onSave={handleSave}
+          onClose={() => setEditingCat(null)}
+        />
+      )}
     </>
   );
 }
 
-export function CategoryBreakdown({ categories }) {
-  const [filter, setFilter] = useState("all");
+export function CategoryBreakdown({ categories, onCategoriesChange }) {
+  const [filter, setFilter]     = useState("all");
   const [expanded, setExpanded] = useState(false);
-
-  const expandBtn = (
-    <button onClick={() => setExpanded(true)} title="Expand" style={{ fontSize: 13, lineHeight: 1, background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", color: "#6b7280", padding: "3px 8px", marginLeft: 4 }}>⤢</button>
-  );
 
   return (
     <>
@@ -63,7 +170,7 @@ export function CategoryBreakdown({ categories }) {
                 {f === "all" ? "All" : ACCT_LABEL[f]}
               </button>
             ))}
-            {expandBtn}
+            <button onClick={() => setExpanded(true)} title="Expand" style={{ fontSize: 13, lineHeight: 1, background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", color: "#6b7280", padding: "3px 8px", marginLeft: 4 }}>⤢</button>
           </div>
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
@@ -92,7 +199,13 @@ export function CategoryBreakdown({ categories }) {
       {expanded && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setExpanded(false)}>
           <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", width: "70vw", maxWidth: 900, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
-            <CategoryList categories={categories} filter={filter} setFilter={setFilter} onClose={() => setExpanded(false)} />
+            <CategoryList
+              categories={categories}
+              filter={filter}
+              setFilter={setFilter}
+              onClose={() => setExpanded(false)}
+              onCategoriesChange={onCategoriesChange}
+            />
           </div>
         </div>
       )}

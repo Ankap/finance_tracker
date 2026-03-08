@@ -2,20 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { ExpensesClient } from '../components/expenses/ExpensesClient';
 import { getExpensesData } from '../lib/expenses.data';
 
-function getCurrentMonth() {
-  return new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+function getLast12Months() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }));
+  }
+  return months;
 }
 
+const MONTHS = getLast12Months();
+
 const Expenses = () => {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(MONTHS[0]);
+  const [data, setData]                   = useState(null);
+  const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
-    getExpensesData(getCurrentMonth()).then(d => {
+    setLoading(true);
+    getExpensesData(selectedMonth).then(d => {
       setData(d);
       setLoading(false);
     });
-  }, []);
+  }, [selectedMonth]);
 
   if (loading) {
     return (
@@ -25,7 +35,14 @@ const Expenses = () => {
     );
   }
 
-  return <ExpensesClient data={data} />;
+  return (
+    <ExpensesClient
+      data={data}
+      months={MONTHS}
+      selectedMonth={selectedMonth}
+      onMonthChange={setSelectedMonth}
+    />
+  );
 };
 
 export default Expenses;
