@@ -331,7 +331,7 @@ const DashboardScreen = () => {
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-sm text-gray-500 mb-3">
-                        AI-powered recommendations aren't generated yet. Visit the AI Summary screen to generate personalised advice based on your data.
+                        AI-powered recommendations aren&apos;t generated yet. Visit the AI Summary screen to generate personalised advice based on your data.
                       </p>
                       <button
                         onClick={() => { setShowHealthModal(false); navigate('/ai-summary'); }}
