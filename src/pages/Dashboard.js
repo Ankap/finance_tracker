@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle, Lightbulb, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus, ChevronRight, Plus } from 'lucide-react';
+import { CheckCircle, AlertCircle, Lightbulb, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { assetsAPI, snapshotsAPI, goalsAPI } from '../services/api';
+import { assetsAPI, snapshotsAPI, goalsAPI, transactionsAPI } from '../services/api';
 import { formatFullCurrency, formatCurrency, getGoalIcon } from '../utils/formatters';
 
 // --- Financial Health Score Calculation ---
@@ -111,14 +111,26 @@ const DashboardScreen = () => {
     const fetchData = async () => {
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
-        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes, allGoalsRes] = await Promise.all([
+        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes, allGoalsRes, liveRes] = await Promise.all([
           snapshotsAPI.getLatest(),
           goalsAPI.getSummary(),
           assetsAPI.getNetWorth(),
           snapshotsAPI.getAll(startDate, endDate),
           goalsAPI.getAll(),
+          transactionsAPI.getLiveMonthlySummary(),
         ]);
-        setSnapshotData(snapshotRes.data);
+        const live = liveRes.data;
+        const baseSnapshot = snapshotRes.data;
+        const mergedSnapshot = live ? {
+          ...baseSnapshot,
+          snapshot: live.snapshot,
+          growth: {
+            ...baseSnapshot?.growth,
+            expenseChange:    live.growth.expenseChange,
+            savingsRateChange: live.growth.savingsRateChange,
+          },
+        } : baseSnapshot;
+        setSnapshotData(mergedSnapshot);
         setGoalsSummary(goalsRes.data);
         setNetWorthData(netWorthRes.data);
         setSnapshots(snapshotsRes.data || []);
@@ -220,194 +232,129 @@ const DashboardScreen = () => {
     <div className="space-y-8">
 
       {/* Financial Health Modal */}
-      {showHealthModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-2xl">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 ${status.color} rounded-full flex items-center justify-center`}>
-                  <Info className="text-white" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Financial Health Score</h2>
-                  <p className="text-sm text-gray-500">Understanding your {healthScore}/100 score</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowHealthModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="text-gray-500" size={24} />
-              </button>
-            </div>
+      {showHealthModal && (() => {
+        // Read AI recommendations from the same localStorage cache as AISummary — no API call
+        let aiRecommendations = null;
+        try {
+          const raw = localStorage.getItem('ai_insights_cache');
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (cached.v === 'v2' && cached.insights?.recommendations?.length) {
+              aiRecommendations = cached.insights.recommendations;
+            }
+          }
+        } catch {}
 
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Overall Status */}
-              <div className={`${status.color} bg-opacity-10 border-2 border-${status.color} rounded-xl p-4`}>
-                <div className="flex items-center justify-between">
+        const scoreRows = [
+          { label: 'Savings Rate',        weight: '30%', score: savingsScore,       color: 'bg-teal-500',   tip: savingsRate >= 50 ? null : savingsRate >= 30 ? `Raise savings from ${savingsRate.toFixed(0)}% → 50%` : `Raise savings from ${savingsRate.toFixed(0)}% → 30%` },
+          { label: 'Goals Progress',      weight: '20%', score: goalScore,          color: 'bg-blue-500',   tip: goalScore >= 80 ? null : goalsSummary?.total === 0 ? 'Set at least one financial goal' : 'Move more goals to On Track or ahead' },
+          { label: 'Asset Diversification', weight: '15%', score: diversificationScore, color: 'bg-purple-500', tip: diversificationScore >= 100 ? null : `Add more asset types (${Object.keys(netWorthData?.breakdown || {}).length}/5)` },
+          { label: 'Expense Control',     weight: '15%', score: expenseScore,       color: 'bg-orange-500', tip: expenseScore >= 80 ? null : `Expenses at ${income > 0 ? ((expenses / income) * 100).toFixed(0) : 0}% of income — aim for <50%` },
+          { label: 'Wealth Growth',       weight: '20%', score: growthScore,        color: 'bg-green-500',  tip: growthScore >= 80 ? null : 'Keep net worth growing month over month' },
+        ];
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 ${status.color} rounded-full flex items-center justify-center flex-shrink-0`}>
+                    <Info className="text-white" size={18} />
+                  </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">Your Status</p>
-                    <p className={`text-2xl font-bold ${status.textColor}`}>{status.label}</p>
+                    <h2 className="text-lg font-bold text-gray-900">Financial Health Score</h2>
+                    <p className="text-xs text-gray-500">{status.label} · {healthScore}/100</p>
                   </div>
-                  <div className={`text-4xl font-bold ${status.textColor}`}>{healthScore}/100</div>
                 </div>
+                <button onClick={() => setShowHealthModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X className="text-gray-500" size={20} />
+                </button>
               </div>
 
-              {/* Explanation */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <Info size={18} />
-                  How is this calculated?
-                </h3>
-                <p className="text-sm text-blue-800">
-                  Your financial health score is calculated by analyzing 5 key areas of your finances. Each area contributes a specific percentage to your overall score.
-                </p>
+              <div className="p-6 space-y-6">
+
+                {/* Score breakdown — compact */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Score breakdown</p>
+                  <div className="space-y-2.5">
+                    {scoreRows.map(({ label, weight, score, color, tip }) => (
+                      <div key={label}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-800">{label}</span>
+                            <span className="text-xs text-gray-400">{weight}</span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-700">{score.toFixed(0)}/100</span>
+                        </div>
+                        <div className="bg-gray-100 rounded-full h-1.5">
+                          <div className={`${color} h-1.5 rounded-full transition-all`} style={{ width: `${score}%` }} />
+                        </div>
+                        {tip && <p className="text-xs text-gray-400 mt-0.5">↑ {tip}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Recommendations — primary focus */}
+                <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-2xl p-5 border border-teal-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="text-teal-600" size={18} />
+                      <h3 className="font-semibold text-gray-900">How to Improve Your Score</h3>
+                    </div>
+                    {aiRecommendations && (
+                      <button
+                        onClick={() => { setShowHealthModal(false); navigate('/ai-summary'); }}
+                        className="text-xs text-teal-600 hover:underline flex items-center gap-1"
+                      >
+                        Full analysis <ArrowRight size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {aiRecommendations ? (
+                    <div className="space-y-3">
+                      {aiRecommendations.map((rec, i) => (
+                        <div key={i} className="flex items-start gap-2.5">
+                          <div className="w-5 h-5 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-teal-700 text-xs font-bold">{i + 1}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{rec.heading}</p>
+                            <p className="text-sm text-gray-600 mt-0.5">{rec.body}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 mb-3">
+                        AI-powered recommendations aren't generated yet. Visit the AI Summary screen to generate personalised advice based on your data.
+                      </p>
+                      <button
+                        onClick={() => { setShowHealthModal(false); navigate('/ai-summary'); }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-xl hover:bg-teal-700 transition-colors"
+                      >
+                        <Sparkles size={14} />
+                        Generate AI Recommendations
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowHealthModal(false)}
+                  className="w-full bg-gray-900 hover:bg-gray-800 text-white py-2.5 px-6 rounded-xl font-medium transition-colors text-sm"
+                >
+                  Got it, thanks!
+                </button>
               </div>
-
-              {/* Score Breakdown */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Score Breakdown</h3>
-
-                {/* Savings Rate */}
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-teal-600 rounded-full"></div>
-                      <h4 className="font-semibold text-gray-900">Savings Rate</h4>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">30% weight</span>
-                    </div>
-                    <span className="font-bold text-teal-600">{savingsScore.toFixed(0)}/100</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">Your current savings rate: <span className="font-semibold">{savingsRate.toFixed(0)}%</span></p>
-                  <div className="bg-gray-100 rounded-full h-2 mb-2">
-                    <div className="bg-teal-600 rounded-full h-2" style={{ width: `${savingsScore}%` }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {savingsRate >= 50 ? 'Excellent! You\'re saving 50% or more.' :
-                     savingsRate >= 30 ? 'Great job! Aim for 50% for an excellent score.' :
-                     savingsRate >= 20 ? 'Good start. Try to reach 30% for better health.' :
-                     'Consider increasing your savings to at least 20% of income.'}
-                  </p>
-                </div>
-
-                {/* Goals Progress */}
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                      <h4 className="font-semibold text-gray-900">Goals Progress</h4>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">20% weight</span>
-                    </div>
-                    <span className="font-bold text-blue-600">{goalScore.toFixed(0)}/100</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {goalsSummary?.total > 0
-                      ? `${(goalsSummary.onTrack || 0) + (goalsSummary.completed || 0) + (goalsSummary.ahead || 0)} of ${goalsSummary.total} goals on track`
-                      : 'No goals set yet'}
-                  </p>
-                  <div className="bg-gray-100 rounded-full h-2 mb-2">
-                    <div className="bg-blue-600 rounded-full h-2" style={{ width: `${goalScore}%` }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {goalsSummary?.total === 0 ? 'Set financial goals to improve this score.' :
-                     goalScore >= 80 ? 'Excellent goal management!' :
-                     'Keep working on your goals to improve this score.'}
-                  </p>
-                </div>
-
-                {/* Diversification */}
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                      <h4 className="font-semibold text-gray-900">Asset Diversification</h4>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">15% weight</span>
-                    </div>
-                    <span className="font-bold text-purple-600">{diversificationScore.toFixed(0)}/100</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    You have {Object.keys(netWorthData?.breakdown || {}).length} asset types
-                  </p>
-                  <div className="bg-gray-100 rounded-full h-2 mb-2">
-                    <div className="bg-purple-600 rounded-full h-2" style={{ width: `${diversificationScore}%` }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {diversificationScore >= 100 ? 'Excellent diversification across 5+ asset types!' :
-                     diversificationScore >= 60 ? 'Good spread. Consider adding more asset types.' :
-                     'Diversify across more asset types to reduce risk.'}
-                  </p>
-                </div>
-
-                {/* Expense Control */}
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
-                      <h4 className="font-semibold text-gray-900">Expense Control</h4>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">15% weight</span>
-                    </div>
-                    <span className="font-bold text-orange-600">{expenseScore.toFixed(0)}/100</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Expenses are {income > 0 ? ((expenses / income) * 100).toFixed(0) : 0}% of income
-                  </p>
-                  <div className="bg-gray-100 rounded-full h-2 mb-2">
-                    <div className="bg-orange-600 rounded-full h-2" style={{ width: `${expenseScore}%` }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {expenseScore >= 100 ? 'Excellent! Expenses under 30% of income.' :
-                     expenseScore >= 60 ? 'Good control. Keep expenses below 50%.' :
-                     'Try to reduce expenses relative to your income.'}
-                  </p>
-                </div>
-
-                {/* Wealth Growth */}
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                      <h4 className="font-semibold text-gray-900">Wealth Growth</h4>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">20% weight</span>
-                    </div>
-                    <span className="font-bold text-green-600">{growthScore.toFixed(0)}/100</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Net worth changed by {growth.netWorthChangePercentage > 0 ? '+' : ''}{(growth.netWorthChangePercentage || 0).toFixed(1)}% this month
-                  </p>
-                  <div className="bg-gray-100 rounded-full h-2 mb-2">
-                    <div className="bg-green-600 rounded-full h-2" style={{ width: `${growthScore}%` }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {growthScore >= 100 ? 'Excellent! Growing over 5% monthly.' :
-                     growthScore >= 60 ? 'Positive growth. Keep it up!' :
-                     growthScore >= 40 ? 'Small growth is still progress.' :
-                     'Focus on growing your net worth consistently.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-2">Summary</h3>
-                <p className="text-sm text-gray-700">
-                  Your overall score of <span className="font-bold">{healthScore}/100</span> is calculated by combining these 5 areas with their respective weights.
-                  Focus on improving the areas with lower scores to boost your overall financial health.
-                </p>
-              </div>
-
-              {/* Close Button */}
-              <button
-                onClick={() => setShowHealthModal(false)}
-                className="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 px-6 rounded-lg font-medium transition-colors"
-              >
-                Got it, thanks!
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Two-column outer layout: left stacks Health+Snapshot then Chart+Insights; right is Goals spanning full height */}
       <div className="flex gap-6 items-stretch">

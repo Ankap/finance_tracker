@@ -147,6 +147,20 @@ export default async function handler(req, res) {
           accountDetails: '',
           monthlySnapshots: [{ value: currentValue, returnPercentage: 0, date: new Date().toISOString() }],
         });
+      } else if (action === 'delete') {
+        const { assetId } = req.body;
+        // Remove the asset from every monthly KV entry
+        const allKeys = await getSortedKeys();
+        for (const key of allKeys) {
+          const monthData = await kv.get(key);
+          if (monthData && monthData.assets) {
+            const filtered = monthData.assets.filter(a => a._id !== assetId);
+            if (filtered.length !== monthData.assets.length) {
+              await kv.set(key, { ...monthData, assets: filtered, lastUpdated: new Date().toISOString() });
+            }
+          }
+        }
+        return res.status(200).json({ data: { success: true } });
       }
 
       fileData.lastUpdated = new Date().toISOString();

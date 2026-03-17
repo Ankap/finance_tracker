@@ -249,7 +249,7 @@ export const assetsAPI = {
   getById: (id) => Promise.resolve({ data: staticAssets.find(a => a._id === id) }),
   create: (assetData) => postToAssetsAPI({ action: 'create', ...assetData }),
   update: () => Promise.resolve({ data: { success: true } }),
-  delete: () => Promise.resolve({ data: { success: true } }),
+  delete: (id) => postToAssetsAPI({ action: 'delete', assetId: id }),
   addSnapshot: (assetId, snapshot) =>
     postToAssetsAPI({ action: 'addSnapshot', assetId, ...snapshot }),
   getNetWorth: async (owner = null) => {
@@ -277,6 +277,25 @@ export const goalsAPI = {
       return res.json();
     } catch {
       return { data: [] };
+    }
+  },
+  getSummary: async () => {
+    try {
+      const res = await fetch('/api/goals');
+      if (!res.ok) throw new Error('API unavailable');
+      const json = await res.json();
+      const goals = json.data || [];
+      return {
+        data: {
+          total: goals.length,
+          completed: goals.filter(g => g.status === 'Completed').length,
+          ahead: goals.filter(g => g.status === 'Ahead').length,
+          onTrack: goals.filter(g => g.status === 'On Track').length,
+          behind: goals.filter(g => g.status === 'Behind').length,
+        },
+      };
+    } catch {
+      return { data: { total: 0, completed: 0, ahead: 0, onTrack: 0, behind: 0 } };
     }
   },
   create: async (goal) => {
@@ -311,6 +330,68 @@ export const transactionsAPI = {
   create: () => Promise.resolve({ data: { success: true } }),
   createBulk: () => Promise.resolve({ data: { success: true } }),
   update: () => Promise.resolve({ data: { success: true } }),
+  getLiveMonthlySummary: async () => {
+    try {
+      const now = new Date();
+      const currKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevKey = `${prevDate.getFullYear()}_${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+      const [expRes, incRes, prevExpRes] = await Promise.all([
+        fetch(`/api/expenses?month=${currKey}`),
+        fetch('/api/income'),
+        fetch(`/api/expenses?month=${prevKey}`),
+      ]);
+
+      const expJson  = expRes.ok     ? await expRes.json()     : null;
+      const incJson  = incRes.ok     ? await incRes.json()     : null;
+      const prevJson = prevExpRes.ok ? await prevExpRes.json() : null;
+
+      const global = incJson?.data  || {};
+      const curr   = expJson?.data  || {};
+      const prev   = prevJson?.data || {};
+
+      // --- helpers (mirrors ExpensesClient exactly) ---
+      const calcTotals = (d, globalInc, globalSips, globalFixed) => {
+        const anuragSalary  = globalInc.anurag?.salary ?? 0;
+        const nidhiSalary   = globalInc.nidhi?.salary  ?? 0;
+        const anuragBonus   = d.income?.anurag?.bonus ?? 0;
+        const nidhiBonus    = d.income?.nidhi?.bonus  ?? 0;
+        const totalIncome   = anuragSalary + nidhiSalary + anuragBonus + nidhiBonus;
+
+        const sips          = d.sips          ?? globalSips  ?? 0;
+        const fixedExpenses = d.fixedExpenses ?? globalFixed ?? [];
+        const totalFixed    = (fixedExpenses || []).reduce((s, f) => s + (f.amount || 0), 0);
+        const totalCC       = (d.creditCards  || []).reduce((s, c) => s + (c.spend  || 0), 0);
+        const catTotal      = (d.categories   || []).reduce((s, c) => s + (c.amount || 0), 0);
+        const expAcc        = d.expenses || {};
+        const totalExpenses = (expAcc.joint || 0) + (expAcc.anurag || 0) + (expAcc.nidhi || 0)
+                              + totalFixed + sips + catTotal;
+        const surplus       = totalIncome - totalExpenses - totalCC;
+        const savingsRate   = totalIncome > 0 ? Math.round((surplus / totalIncome) * 100) : 0;
+        return { totalIncome, totalExpenses, surplus, savingsRate };
+      };
+
+      const c = calcTotals(curr, global, global.sips, global.fixedExpenses);
+      const p = calcTotals(prev, global, global.sips, global.fixedExpenses);
+
+      return {
+        data: {
+          snapshot: {
+            income:   { total: c.totalIncome },
+            expenses: { total: c.totalExpenses },
+            savings:  { rate: c.savingsRate, amount: c.surplus },
+          },
+          growth: {
+            expenseChange:    c.totalExpenses - p.totalExpenses,
+            savingsRateChange: c.savingsRate  - p.savingsRate,
+          },
+        },
+      };
+    } catch {
+      return { data: null };
+    }
+  },
   delete: () => Promise.resolve({ data: { success: true } }),
   getMonthlySummary: () => Promise.resolve({ data: monthlySummary }),
   getCategoryTrends: () => Promise.resolve({ data: [] }),

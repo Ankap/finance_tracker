@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Sparkles, Maximize2, X } from 'lucide-react';
+import { TrendingUp, Sparkles, Maximize2, X, Trash2 } from 'lucide-react';
 import { assetsAPI } from '../services/api';
 import { formatCurrency, formatPercentage, getAssetIcon, formatDate } from '../utils/formatters';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -10,6 +10,7 @@ const WealthOverview = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOwner, setSelectedOwner] = useState('All');
   const [isChartExpanded, setIsChartExpanded] = useState(false);
+  const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null); // { _id, name }
 
   const fetchData = useCallback(async () => {
     try {
@@ -74,6 +75,15 @@ const WealthOverview = () => {
     if (!snaps || snaps.length < 2) return 0;
     return snaps[snaps.length - 1].value - snaps[snaps.length - 2].value;
   })();
+
+  const handleDelete = async () => {
+    if (!confirmDeleteAsset) return;
+    const { _id } = confirmDeleteAsset;
+    setConfirmDeleteAsset(null);
+    setAssets(prev => prev.filter(a => a._id !== _id));
+    await assetsAPI.delete(_id);
+    fetchData();
+  };
 
   return (
     /* Layout's main already has py-8 (64px) + sticky header (~73px) ≈ 137px consumed */
@@ -175,7 +185,7 @@ const WealthOverview = () => {
                 {assets.map((asset) => (
                   <div
                     key={asset._id}
-                    className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                    className="group flex items-center gap-3 p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
                   >
                     <div className="w-9 h-9 bg-sage-100 rounded-full flex items-center justify-center text-lg flex-shrink-0">
                       {getAssetIcon(asset.name)}
@@ -203,6 +213,13 @@ const WealthOverview = () => {
                         </p>
                       )}
                     </div>
+                    <button
+                      onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
+                      title="Delete asset"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -210,6 +227,44 @@ const WealthOverview = () => {
 
           </div>
       </div>
+
+      {/* Delete confirmation popup */}
+      {confirmDeleteAsset && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setConfirmDeleteAsset(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 w-72 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trash2 size={16} className="text-red-500" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Delete asset?</p>
+                <p className="text-xs text-gray-500 mt-0.5">{confirmDeleteAsset.name}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">This will permanently remove the asset and all its history. This cannot be undone.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDeleteAsset(null)}
+                className="flex-1 px-3 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-3 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Expanded chart modal */}
       {isChartExpanded && (
