@@ -1,3 +1,13 @@
+function monthLabelToKey(label) {
+  const d = new Date(`1 ${label}`);
+  if (isNaN(d)) return null;
+  const year  = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}_${month}`;
+}
+
+export { monthLabelToKey };
+
 const DEFAULT_DATA = {
   income: {
     anurag: { salary: 220000, bonus: 0 },
@@ -99,20 +109,36 @@ export async function getExpensesData(month) {
     const expJson = await expRes.json();
     const incJson = incRes.ok ? await incRes.json() : null;
 
-    const global     = incJson?.data || {};
-    const monthBonus = expJson.data?.income || {};
+    const global      = incJson?.data || {};
+    const monthIncome = expJson.data?.income || {};
 
-    // Salary: global (persists across months). Bonus: monthly (specific to that month).
+    // Salary: use the month's own saved salary if it was explicitly set (> 0),
+    // otherwise fall back to global — so past months keep their locked-in salary
+    // while future/new months inherit the latest global value.
+    // Bonus: always monthly (specific to that month).
     const income = {
-      anurag: { salary: global.anurag?.salary ?? DEFAULT_DATA.income.anurag.salary, bonus: monthBonus.anurag?.bonus ?? 0 },
-      nidhi:  { salary: global.nidhi?.salary  ?? DEFAULT_DATA.income.nidhi.salary,  bonus: monthBonus.nidhi?.bonus  ?? 0 },
+      anurag: {
+        salary: monthIncome.anurag?.salary > 0
+          ? monthIncome.anurag.salary
+          : (global.anurag?.salary ?? DEFAULT_DATA.income.anurag.salary),
+        bonus: monthIncome.anurag?.bonus ?? 0,
+      },
+      nidhi: {
+        salary: monthIncome.nidhi?.salary > 0
+          ? monthIncome.nidhi.salary
+          : (global.nidhi?.salary ?? DEFAULT_DATA.income.nidhi.salary),
+        bonus: monthIncome.nidhi?.bonus ?? 0,
+      },
     };
 
     // SIPs and fixed expenses: use the month's own saved value if set (non-null),
     // otherwise fall back to global — so future months inherit current values
     // but past months keep their own locked-in values.
-    const sips          = expJson.data?.sips          ?? global.sips          ?? DEFAULT_DATA.sips;
-    const fixedExpenses = expJson.data?.fixedExpenses ?? global.fixedExpenses ?? DEFAULT_DATA.fixedExpenses;
+    const sips = expJson.data?.sips ?? global.sips ?? DEFAULT_DATA.sips;
+
+    // Fixed expenses are global — all months always use the same list from /api/income.
+    // Editing fixed expenses in any month updates the global list for all months.
+    const fixedExpenses = global.fixedExpenses ?? DEFAULT_DATA.fixedExpenses;
 
     return { ...DEFAULT_DATA, ...expJson.data, income, sips, fixedExpenses, month };
   } catch {
@@ -122,7 +148,7 @@ export async function getExpensesData(month) {
 
 export async function saveIncome(month, anuragSalary, anuragBonus, nidhiSalary, nidhiBonus) {
   try {
-    // Salary saved globally — shared across all months.
+    // Salary saved globally — used as default for future months that haven't set their own.
     await fetch('/api/income', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,7 +157,8 @@ export async function saveIncome(month, anuragSalary, anuragBonus, nidhiSalary, 
         nidhi:  { salary: nidhiSalary  },
       }),
     });
-    // Bonus saved in the monthly data — specific to this month.
+    // Salary + bonus both saved in monthly data — locks income to this specific month.
+    // This prevents a future global salary change from retroactively altering past months.
     await fetch('/api/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -139,8 +166,8 @@ export async function saveIncome(month, anuragSalary, anuragBonus, nidhiSalary, 
         action: 'save',
         month,
         income: {
-          anurag: { bonus: anuragBonus },
-          nidhi:  { bonus: nidhiBonus  },
+          anurag: { salary: anuragSalary, bonus: anuragBonus },
+          nidhi:  { salary: nidhiSalary,  bonus: nidhiBonus  },
         },
       }),
     });

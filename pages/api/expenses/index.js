@@ -168,7 +168,8 @@ export default async function handler(req, res) {
             nidhi:  { label: "Nidhi's Account",  opening: 0, moneyIn: [], moneyOut: [], ccBillPaid: 0, ccBillNote: null, ccSpends: null },
           },
           categories: [],
-          fixedExpenses: [],
+          fixedExpenses: null,
+          fixedExpensesLocked: false,
           creditCards: [],
           aiInsights: [],
         });

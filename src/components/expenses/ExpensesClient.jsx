@@ -5,7 +5,7 @@ import { AccountHealthCards } from './AccountHealthCards';
 import { AIInsights }         from './AIInsights';
 import { CategoryBreakdown }  from './CategoryBreakdown';
 import { IncomeEditModal }    from './IncomeEditModal';
-import { saveIncome, saveExpensesData, saveGlobalDefaults } from '../../lib/expenses.data';
+import { saveIncome, saveExpensesData, saveGlobalDefaults, monthLabelToKey } from '../../lib/expenses.data';
 
 const BLANK = {
   income:           { anurag: { salary: 0, bonus: 0 }, nidhi: { salary: 0, bonus: 0 } },
@@ -71,8 +71,11 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
     setAiInsights(BLANK.aiInsights);
   };
 
-  const totalIncome     = income.anurag.salary + income.anurag.bonus + income.nidhi.salary + income.nidhi.bonus;
-  const totalFixed      = fixedExpenses.reduce((s, f) => s + f.amount, 0);
+  const totalIncome  = income.anurag.salary + income.anurag.bonus + income.nidhi.salary + income.nidhi.bonus;
+  const viewedKey    = monthLabelToKey(data.month) || '';
+  const visibleFixed = fixedExpenses.filter(fe => !fe.addedMonth || monthLabelToKey(fe.addedMonth) <= viewedKey);
+  const hiddenFixed  = fixedExpenses.filter(fe => fe.addedMonth && monthLabelToKey(fe.addedMonth) > viewedKey);
+  const totalFixed   = visibleFixed.reduce((s, f) => s + f.amount, 0);
   const totalCC         = creditCards.reduce((s, c) => s + c.spend, 0);
   const categoriesTotal = categories.reduce((s, c) => s + c.amount, 0);
   const totalExpenses   = expenses.joint + expenses.anurag + expenses.nidhi + totalFixed + sips + categoriesTotal;
@@ -128,8 +131,10 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
           totalIncome={totalIncome}
           sips={sips}
           onSipsChange={(v) => { setSips(v); persist({ sips: v }); saveGlobalDefaults({ sips: v }); }}
-          fixedExpenses={fixedExpenses}
-          onFixedExpensesChange={(v) => { setFixedExpenses(v); persist({ fixedExpenses: v }); saveGlobalDefaults({ fixedExpenses: v }); }}
+          fixedExpenses={visibleFixed}
+          onFixedExpensesChange={(v) => { const updated = [...v, ...hiddenFixed]; setFixedExpenses(updated); saveGlobalDefaults({ fixedExpenses: updated }); }}
+          canEditFixed={data.month === new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+          month={data.month}
           creditCards={creditCards}
           onCreditCardsChange={(v) => { setCreditCards(v); persist({ creditCards: v }); }}
         />

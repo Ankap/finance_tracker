@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ExpensesClient } from '../components/expenses/ExpensesClient';
 import { getExpensesData } from '../lib/expenses.data';
 
-function getLast12Months() {
+function getMonthRange() {
   const months = [];
   const now = new Date();
+  // Current month first, then up to 11 past months
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }));
@@ -12,10 +13,9 @@ function getLast12Months() {
   return months;
 }
 
-const MONTHS = getLast12Months();
-
 const Expenses = () => {
-  const [selectedMonth, setSelectedMonth] = useState(MONTHS[0]);
+  const [months] = useState(getMonthRange);
+  const [selectedMonth, setSelectedMonth] = useState(() => getMonthRange()[0]); // index 0 = current month
   const [data, setData]                   = useState(null);
   const [loading, setLoading]             = useState(true);
 
@@ -38,7 +38,7 @@ const Expenses = () => {
   return (
     <ExpensesClient
       data={data}
-      months={MONTHS}
+      months={months}
       selectedMonth={selectedMonth}
       onMonthChange={setSelectedMonth}
     />

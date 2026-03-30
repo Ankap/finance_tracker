@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { fmt, ACCT_STYLES, ACCT_LABEL } from '../../lib/expenses.types';
 
-export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, fixedExpenses, onFixedExpensesChange, creditCards, onCreditCardsChange }) {
+export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, fixedExpenses, onFixedExpensesChange, canEditFixed, month, creditCards, onCreditCardsChange }) {
   const [editTarget, setEditTarget]     = useState(null); // null | "new" | { id, label, amount }
   const [editVals, setEditVals]         = useState({ label: "", amount: "" });
   const [ccEditTarget, setCcEditTarget] = useState(null); // null | "new" | { id, cardName, owner, spend }
@@ -21,7 +21,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
     const amount = Number(editVals.amount);
     if (!label || !amount || amount <= 0) return;
     if (editTarget === "new") {
-      onFixedExpensesChange([...fixedExpenses, { id: Date.now().toString(), label, amount }]);
+      onFixedExpensesChange([...fixedExpenses, { id: Date.now().toString(), label, amount, addedMonth: month }]);
     } else {
       onFixedExpensesChange(fixedExpenses.map(fe => fe.id === editTarget.id ? { ...fe, label, amount } : fe));
     }
@@ -63,7 +63,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
                 {fmt(totalFixed)}<span style={{ fontSize: 11, fontWeight: 500, color: "#9ca3af", marginLeft: 4 }}>/ mo</span>
               </div>
             </div>
-            <button onClick={openAdd} style={{ fontSize: 11, fontWeight: 600, color: "#1e40af", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}>+ Add</button>
+            {canEditFixed && <button onClick={openAdd} style={{ fontSize: 11, fontWeight: 600, color: "#1e40af", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}>+ Add</button>}
           </div>
           {fixedExpenses.length === 0 ? (
             <div style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>No fixed commitments yet.</div>
@@ -75,8 +75,8 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
                     <div style={{ fontSize: 11, color: "#6b7280" }}>{fe.label}</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1e40af" }}>{fmt(fe.amount)}</div>
                   </div>
-                  <button onClick={() => openEdit(fe)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#9ca3af", padding: "1px 3px" }}>✎</button>
-                  <button onClick={() => deleteExpense(fe.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ef4444", padding: "1px 3px" }}>✕</button>
+                  {fe.addedMonth === month && <button onClick={() => openEdit(fe)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#9ca3af", padding: "1px 3px" }}>✎</button>}
+                  {fe.addedMonth === month && <button onClick={() => deleteExpense(fe.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ef4444", padding: "1px 3px" }}>✕</button>}
                 </div>
               ))}
             </div>

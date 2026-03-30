@@ -17,7 +17,7 @@ export function IncomeEditModal({ month, income, onSave, onClose }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 17, color: "#111827" }}>Update Income</div>
-            <div style={{ fontSize: 13, color: "#9ca3af", marginTop: 2 }}>{month} · Salaries carry forward — only update when something changes</div>
+            <div style={{ fontSize: 13, color: "#9ca3af", marginTop: 2 }}>{month} · Salary applies from this month onward · Bonus is this month only</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>✕</button>
         </div>

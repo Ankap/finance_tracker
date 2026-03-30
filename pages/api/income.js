@@ -33,12 +33,13 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { anurag, nidhi, sips, fixedExpenses } = req.body;
       const data = await getIncomeData();
-      if (anurag         !== undefined) data.anurag        = anurag;
-      if (nidhi          !== undefined) data.nidhi         = nidhi;
-      if (sips           !== undefined) data.sips          = sips;
-      if (fixedExpenses  !== undefined) data.fixedExpenses = fixedExpenses;
+      if (anurag         !== undefined) data.anurag         = anurag;
+      if (nidhi          !== undefined) data.nidhi          = nidhi;
+      if (sips           !== undefined) data.sips           = sips;
+      if (fixedExpenses  !== undefined) data.fixedExpenses  = fixedExpenses;
       data.lastUpdated = new Date().toISOString();
       await kv.set('income', data);
+
       return res.status(200).json({ data: { success: true } });
     }
 
