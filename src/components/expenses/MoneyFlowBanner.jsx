@@ -3,7 +3,7 @@ import { fmt, ACCT_STYLES, ACCT_LABEL } from '../../lib/expenses.types';
 
 export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, fixedExpenses, onFixedExpensesChange, canEditFixed, month, creditCards, onCreditCardsChange }) {
   const [editTarget, setEditTarget]     = useState(null); // null | "new" | { id, label, amount }
-  const [editVals, setEditVals]         = useState({ label: "", amount: "" });
+  const [editVals, setEditVals]         = useState({ label: "", amount: "", months: "" });
   const [ccEditTarget, setCcEditTarget] = useState(null); // null | "new" | { id, cardName, owner, spend }
   const [ccEditVals, setCcEditVals]     = useState({ cardName: "", owner: "anurag", spend: "" });
   const [editingSips, setEditingSips]   = useState(false);
@@ -13,17 +13,18 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
   const totalCC    = creditCards.reduce((s, c) => s + c.spend, 0);
 
   // ── Fixed expenses handlers ──
-  const openAdd  = () => { setEditVals({ label: "", amount: "" }); setEditTarget("new"); };
-  const openEdit = (fe) => { setEditVals({ label: fe.label, amount: String(fe.amount) }); setEditTarget(fe); };
+  const openAdd  = () => { setEditVals({ label: "", amount: "", months: "" }); setEditTarget("new"); };
+  const openEdit = (fe) => { setEditVals({ label: fe.label, amount: String(fe.amount), months: fe.months ? String(fe.months) : "" }); setEditTarget(fe); };
   const cancelEdit = () => setEditTarget(null);
   const saveEdit = () => {
     const label  = editVals.label.trim();
     const amount = Number(editVals.amount);
+    const months = editVals.months !== "" ? Number(editVals.months) : 0;
     if (!label || !amount || amount <= 0) return;
     if (editTarget === "new") {
-      onFixedExpensesChange([...fixedExpenses, { id: Date.now().toString(), label, amount, addedMonth: month }]);
+      onFixedExpensesChange([...fixedExpenses, { id: Date.now().toString(), label, amount, months: months || 0, addedMonth: month }]);
     } else {
-      onFixedExpensesChange(fixedExpenses.map(fe => fe.id === editTarget.id ? { ...fe, label, amount } : fe));
+      onFixedExpensesChange(fixedExpenses.map(fe => fe.id === editTarget.id ? { ...fe, label, amount, months: months || 0 } : fe));
     }
     setEditTarget(null);
   };
@@ -74,6 +75,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
                   <div>
                     <div style={{ fontSize: 11, color: "#6b7280" }}>{fe.label}</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1e40af" }}>{fmt(fe.amount)}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>{fe.months > 0 ? `${fe.months} mo` : "permanent"}</div>
                   </div>
                   {fe.addedMonth === month && <button onClick={() => openEdit(fe)} title="Edit" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#9ca3af", padding: "1px 3px" }}>✎</button>}
                   {fe.addedMonth === month && <button onClick={() => deleteExpense(fe.id)} title="Delete" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#ef4444", padding: "1px 3px" }}>✕</button>}
@@ -219,9 +221,14 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
               <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Label</label>
               <input type="text" value={editVals.label} onChange={e => setEditVals(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Home Loan EMI" autoFocus style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
             </div>
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Amount (₹)</label>
               <input type="number" value={editVals.amount} onChange={e => setEditVals(p => ({ ...p, amount: e.target.value }))} placeholder="0" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: 22 }}>
+              <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Duration (months)</label>
+              <input type="number" min="1" value={editVals.months} onChange={e => setEditVals(p => ({ ...p, months: e.target.value }))} placeholder="Leave blank for permanent" style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: 14, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>e.g. 12 for a 1-year EMI. Leave blank if it never ends.</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={cancelEdit} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Cancel</button>

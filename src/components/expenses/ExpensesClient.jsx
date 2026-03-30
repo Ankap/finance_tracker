@@ -73,7 +73,21 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
 
   const totalIncome  = income.anurag.salary + income.anurag.bonus + income.nidhi.salary + income.nidhi.bonus;
   const viewedKey    = monthLabelToKey(data.month) || '';
-  const visibleFixed = fixedExpenses.filter(fe => !fe.addedMonth || monthLabelToKey(fe.addedMonth) <= viewedKey);
+
+  const getEndMonthKey = (fe) => {
+    if (!fe.months || fe.months <= 0) return null; // permanent
+    const d = new Date(`1 ${fe.addedMonth}`);
+    d.setMonth(d.getMonth() + fe.months - 1);
+    return `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const visibleFixed = fixedExpenses.filter(fe => {
+    const startKey = fe.addedMonth ? monthLabelToKey(fe.addedMonth) : null;
+    if (startKey && startKey > viewedKey) return false;
+    const endKey = getEndMonthKey(fe);
+    if (endKey && endKey < viewedKey) return false;
+    return true;
+  });
   const hiddenFixed  = fixedExpenses.filter(fe => fe.addedMonth && monthLabelToKey(fe.addedMonth) > viewedKey);
   const totalFixed   = visibleFixed.reduce((s, f) => s + f.amount, 0);
   const totalCC         = creditCards.reduce((s, c) => s + c.spend, 0);
@@ -133,7 +147,7 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
           onSipsChange={(v) => { setSips(v); persist({ sips: v }); saveGlobalDefaults({ sips: v }); }}
           fixedExpenses={visibleFixed}
           onFixedExpensesChange={(v) => { const updated = [...v, ...hiddenFixed]; setFixedExpenses(updated); saveGlobalDefaults({ fixedExpenses: updated }); }}
-          canEditFixed={data.month === new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+          canEditFixed={true}
           month={data.month}
           creditCards={creditCards}
           onCreditCardsChange={(v) => { setCreditCards(v); persist({ creditCards: v }); }}
