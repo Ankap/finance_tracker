@@ -98,9 +98,9 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
   const savingsRate     = totalIncome > 0 ? Math.round((surplus / totalIncome) * 100) : 0;
 
   return (
-    <div style={{ background: "#f9fafb", minHeight: "100vh", fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+    <div style={{ background: "#f9fafb", fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="expenses-header-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", letterSpacing: "-0.5px" }}>Expenses</div>
             <div style={{ fontSize: 14, color: "#9ca3af", marginTop: 3 }}>Monthly money flow · {data.month}</div>
@@ -158,14 +158,14 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
           onAccountsChange={(v) => { setAccounts(v); persist({ accounts: v }); }}
         />
 
-        <div ref={categoryRef} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div ref={categoryRef} className="expenses-bottom-row" style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
             <CategoryBreakdown
               categories={categories}
               onCategoriesChange={(v) => { setCategories(v); persist({ categories: v }); }}
             />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
             <AIInsights
               insights={aiInsights}
               onInsightsChange={(v) => { setAiInsights(v); persist({ aiInsights: v }); }}

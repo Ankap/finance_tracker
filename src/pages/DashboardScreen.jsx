@@ -1,32 +1,17 @@
 import React from 'react';
-import { CheckCircle, AlertCircle, User } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 const DashboardScreen = () => {
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div>
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-8">
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            <nav className="flex items-center gap-6">
-              <button className="text-gray-900 font-medium border-b-2 border-gray-900 pb-1">
-                Dashboard
-              </button>
-              <button className="text-gray-500 hover:text-gray-700">Wealth</button>
-              <button className="text-gray-500 hover:text-gray-700">Goals</button>
-              <button className="text-gray-500 hover:text-gray-700">Expenses</button>
-            </nav>
-          </div>
-          <button className="p-2 hover:bg-gray-100 rounded-lg">
-            <User className="text-gray-600" size={24} />
-          </button>
-        </div>
+        {/* Page title */}
+        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-6">Overview</h1>
 
         {/* Net Worth Card */}
-        <div className="bg-white rounded-2xl p-8 mb-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 mb-6 shadow-sm">
           <div className="text-center">
-            <h2 className="text-5xl font-bold text-gray-900 mb-2">₹77,50,000</h2>
+            <h2 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-2">₹77,50,000</h2>
             <p className="text-gray-500 text-lg mb-4">Total Net Worth</p>
             <div className="flex items-center justify-center gap-2">
               <span className="text-green-600 font-semibold text-lg">+4.2%</span>
@@ -37,7 +22,7 @@ const DashboardScreen = () => {
         </div>
 
         {/* Key Insights */}
-        <div className="bg-white rounded-2xl p-8 shadow-sm">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm">
           <h3 className="text-xl font-semibold text-gray-900 mb-6">Key Insights</h3>
           
           <div className="space-y-4">
@@ -77,3 +62,4 @@ const DashboardScreen = () => {
 };
 
 export default DashboardScreen;
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, User, Home as HomeIcon, Plane, Shield, ChevronRight, Plus } from 'lucide-react';
+import { Sparkles, Home as HomeIcon, Plane, Shield, ChevronRight, Plus } from 'lucide-react';
 import { snapshotsAPI } from '../services/api';
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { formatCurrency } from '../utils/formatters';
@@ -83,30 +83,17 @@ const WealthOverviewScreen = () => {
   const completedCount = goals.filter(g => g.progress >= 100).length;
 
   return (
-    <div className="h-screen bg-gray-50 p-4 overflow-hidden">
-      <div className="max-w-6xl mx-auto h-full flex flex-col gap-3">
+    <div className="bg-gray-50">
+      <div className="max-w-6xl mx-auto flex flex-col gap-3">
 
-        {/* Header */}
-        <div className="flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-6">
-            <h1 className="text-lg font-semibold text-gray-900">Wealth Overview</h1>
-            <nav className="flex items-center gap-4 text-sm text-gray-600">
-              <button className="hover:text-gray-800">Dashboard</button>
-              <button className="text-gray-900 font-medium border-b-2 border-gray-900 pb-0.5">Wealth</button>
-              <button className="hover:text-gray-800">Goals</button>
-              <button className="hover:text-gray-800">Expenses</button>
-            </nav>
-          </div>
-          <button className="p-1 hover:bg-gray-100 rounded-md">
-            <User className="text-gray-600" size={20} />
-          </button>
-        </div>
+        {/* Page title */}
+        <h1 className="text-lg font-semibold text-gray-900">Wealth Overview</h1>
 
-        {/* Two-column body */}
-        <div className="flex gap-4 flex-1 min-h-0">
+        {/* Two-column body — stacks on mobile */}
+        <div className="flex flex-col lg:flex-row gap-4">
 
           {/* Left column: wealth content */}
-          <div className="flex-1 flex flex-col gap-3 min-h-0">
+          <div className="flex-1 flex flex-col gap-3">
 
             {/* Total Net */}
             <div className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between flex-shrink-0">
@@ -178,7 +165,7 @@ const WealthOverviewScreen = () => {
           </div>
 
           {/* Right column: Goals snapshot */}
-          <aside className="w-72 flex-shrink-0 flex flex-col gap-3">
+          <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-3">
 
             {/* Goals header card */}
             <div className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between flex-shrink-0">
@@ -245,6 +232,7 @@ const WealthOverviewScreen = () => {
       </div>
     </div>
   );
+
 };
 
 export default WealthOverviewScreen;

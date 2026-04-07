@@ -53,10 +53,10 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 16 }}>Fixed commitments deducted from your investable surplus</div>
 
       {/* Fixed + CC side by side */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+      <div className="money-flow-cols" style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
 
         {/* Fixed Commitments */}
-        <div style={{ flex: 1, background: "#fafafa", border: "1px solid #e0e7ff", borderRadius: 10, padding: "14px 16px" }}>
+        <div style={{ flex: 1, minWidth: 220, background: "#fafafa", border: "1px solid #e0e7ff", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Fixed</div>
@@ -86,7 +86,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
         </div>
 
         {/* SIPs */}
-        <div style={{ flex: 1, background: "#fafafa", border: "1px solid #6ee7b7", borderRadius: 10, padding: "14px 16px" }}>
+        <div style={{ flex: 1, minWidth: 220, background: "#fafafa", border: "1px solid #6ee7b7", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46", textTransform: "uppercase", letterSpacing: "0.5px" }}>SIPs</div>
@@ -103,7 +103,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
         </div>
 
         {/* Credit Card Spends */}
-        <div style={{ flex: 1, background: "#fafafa", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px" }}>
+        <div style={{ flex: 1, minWidth: 220, background: "#fafafa", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", textTransform: "uppercase", letterSpacing: "0.5px" }}>Variable · CC</div>
@@ -136,7 +136,7 @@ export function MoneyFlowBanner({ investable, totalIncome, sips, onSipsChange, f
       </div>
 
       <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 18, marginBottom: 12 }}>↓</div>
-      <div style={{ background: "#f0faf4", border: "1px solid #6ee7b7", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ background: "#f0faf4", border: "1px solid #6ee7b7", borderRadius: 12, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 13, color: "#2d6a4f", fontWeight: 600, marginBottom: 2 }}>💰 Investable Surplus this month</div>
           <div style={{ fontSize: 12, color: "#6b7280" }}>After expenses, SIPs{totalFixed > 0 ? ", fixed commitments" : ""}{totalCC > 0 ? ", and CC spends" : ""} — free to deploy toward your house fund</div>

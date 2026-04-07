@@ -61,7 +61,7 @@ function AccountEditModal({ acctKey, acct, onSave, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 520, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "min(520px, 92vw)", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 17, color: "#111827" }}>Edit Account</div>
@@ -141,7 +141,7 @@ export function AccountHealthCards({ accounts, onAccountsChange }) {
         Opening → salary in → expenses out → closing balance.{" "}
         <span style={{ color: "#92400e", fontWeight: 600 }}>CC bill payments excluded from expenses</span> — card spends captured from card statement to avoid double-counting.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+      <div className="account-health-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
         {Object.entries(accounts).map(([key, acct]) => {
           const s        = ACCT_STYLES[key];
           const totalIn  = acct.moneyIn.reduce((a, b) => a + b.amount, 0);

@@ -1,4 +1,4 @@
-import { Check, Sparkles, User } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 
 const UpdateDataScreen = () => {
 
@@ -24,28 +24,13 @@ const UpdateDataScreen = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div>
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-8">
-            <h1 className="text-2xl font-semibold text-gray-900">Update Data</h1>
-            <nav className="flex items-center gap-6">
-              <button className="text-gray-500 hover:text-gray-700">Dashboard</button>
-              <button className="text-gray-500 hover:text-gray-700">Wealth</button>
-              <button className="text-gray-500 hover:text-gray-700">Goals</button>
-              <button className="text-gray-900 font-medium border-b-2 border-gray-900 pb-1">
-                Expenses
-              </button>
-            </nav>
-          </div>
-          <button className="p-2 hover:bg-gray-100 rounded-lg">
-            <User className="text-gray-600" size={24} />
-          </button>
-        </div>
+        {/* Page title */}
+        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-6">Update Data</h1>
 
         {/* Task List */}
-        <div className="bg-white rounded-2xl p-8 mb-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 sm:p-8 mb-6 shadow-sm">
           <div className="space-y-4">
             {tasks.map((task, index) => (
               <div key={index} className="flex items-start gap-4 py-3">
@@ -74,7 +59,7 @@ const UpdateDataScreen = () => {
         </div>
 
         {/* AI Review */}
-        <div className="bg-white rounded-2xl p-8 shadow-sm">
+        <div className="bg-white rounded-2xl p-5 sm:p-8 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
               <Sparkles className="text-teal-600" size={20} />

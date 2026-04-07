@@ -49,6 +49,24 @@
   }
 }
 
+/* ── Responsive overrides for inline-styled expense modals ── */
+@media (max-width: 480px) {
+  /* Ensure fixed-width modals (SIPs, CC, Fixed Expense) don't overflow */
+  [style*="width: 340px"],
+  [style*="width: 380px"],
+  [style*="width: 400px"] {
+    width: min(400px, 92vw) !important;
+    box-sizing: border-box;
+  }
+}
+
+/* Safe-area padding for bottom mobile nav on notched phones */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .md\:hidden nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

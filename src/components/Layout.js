@@ -22,14 +22,14 @@ const Layout = ({ children }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3 no-underline">
+            <Link to="/" className="flex items-center gap-2 sm:gap-3 no-underline">
               {/* Photo Logo */}
               <img
                 src="/photo.jpeg"
                 alt="Anurag & Nidhi"
-                className="w-10 h-10 rounded-xl object-cover shadow-sm border border-sage-200 transition-all duration-300 hover:scale-125 hover:shadow-lg hover:rounded-2xl cursor-pointer"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm border border-sage-200 transition-all duration-300 hover:scale-125 hover:shadow-lg hover:rounded-2xl cursor-pointer flex-shrink-0"
                 onClick={(e) => {
                   e.preventDefault();
                   setShowGhibli(false);
@@ -37,13 +37,13 @@ const Layout = ({ children }) => {
                 }}
               />
               <div>
-                <h1 className="text-2xl font-bold text-sage-800 leading-tight">
+                <h1 className="text-lg sm:text-2xl font-bold text-sage-800 leading-tight">
                   Nest<span className="text-sage-600">Worth</span>
                 </h1>
-                <p className="text-xs text-gray-400 tracking-wide">Anurag & Nidhi</p>
+                <p className="text-xs text-gray-400 tracking-wide hidden sm:block">Anurag & Nidhi</p>
               </div>
             </Link>
-            
+
             <nav className="hidden md:flex items-center space-x-1">
               {navItems.map(({ path, label, icon: Icon }) => (
                 <Link
@@ -66,7 +66,7 @@ const Layout = ({ children }) => {
               className="btn-primary flex items-center gap-2 text-sm"
             >
               <Upload size={16} />
-              <span>Update Data</span>
+              <span className="hidden sm:inline">Update Data</span>
             </Link>
           </div>
         </div>
@@ -93,7 +93,7 @@ const Layout = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {children}
       </main>
 
@@ -120,7 +120,7 @@ const Layout = ({ children }) => {
               </button>
             </div>
             {showGhibli && ghibliMissing ? (
-              <div style={{ width: 480, height: 480, background: "rgba(255,255,255,0.08)", borderRadius: 16, border: "2px dashed rgba(255,255,255,0.3)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", gap: 12 }}>
+              <div style={{ width: 'min(480px, 85vw)', height: 'min(480px, 85vw)', background: "rgba(255,255,255,0.08)", borderRadius: 16, border: "2px dashed rgba(255,255,255,0.3)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", gap: 12 }}>
                 <div style={{ fontSize: 48 }}>🎨</div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Ghibli photo not found</div>
                 <div style={{ fontSize: 13, opacity: 0.7, textAlign: "center", maxWidth: 300 }}>Add your Ghibli version at<br /><code style={{ background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 4 }}>public/photo-ghibli.jpeg</code></div>
@@ -129,7 +129,7 @@ const Layout = ({ children }) => {
               <img
                 src={showGhibli ? "/photo-ghibli.jpeg" : "/photo.jpeg"}
                 alt="Anurag & Nidhi"
-                style={{ width: 480, height: 480 }}
+                style={{ width: 'min(480px, 85vw)', height: 'min(480px, 85vw)' }}
                 className="object-cover rounded-2xl shadow-2xl border-4 border-white"
                 onError={() => { if (showGhibli) setGhibliMissing(true); }}
               />
