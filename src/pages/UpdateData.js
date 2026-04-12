@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, TrendingUp, Target, FileText, Check, Sparkles } from 'lucide-react';
-import { assetsAPI, statementsAPI } from '../services/api';
+import { assetsAPI } from '../services/api';
 
 // ── Paytm category → icon mapping ──────────────────────────────────────────
 const CATEGORY_ICONS = {
@@ -30,6 +30,123 @@ function categoryToIcon(cat) {
     if (lower.includes(key)) return icon;
   }
   return '🌐';
+}
+
+// ── CSV line parser (handles quoted fields) ─────────────────────────────────
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+    else { current += ch; }
+  }
+  result.push(current);
+  return result;
+}
+
+// ── Generic CSV parser for Bank Statement / Credit Card / CSV File ───────────
+function parseGenericCSV(arrayBuffer) {
+  const text = new TextDecoder('utf-8').decode(arrayBuffer);
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+
+  // Find header row — must contain a date column and some amount column
+  let headerIdx = -1;
+  let headers = [];
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
+    const cols = parseCSVLine(lines[i]).map(c => c.replace(/^"|"$/g, '').toLowerCase().trim());
+    if (cols.some(c => c.includes('date')) &&
+        cols.some(c => c.includes('debit') || c.includes('withdrawal') || c.includes('amount') || c.includes('dr'))) {
+      headerIdx = i;
+      headers = cols;
+      break;
+    }
+  }
+  if (headerIdx === -1)
+    return { error: 'Could not find a header row with Date and Amount/Debit columns.' };
+
+  // Map column indices
+  const find = (...terms) => {
+    for (const t of terms) {
+      const exact = headers.findIndex(h => h === t);
+      if (exact !== -1) return exact;
+    }
+    for (const t of terms) {
+      const partial = headers.findIndex(h => h.includes(t));
+      if (partial !== -1) return partial;
+    }
+    return -1;
+  };
+
+  const dateCol   = find('date', 'txn date', 'transaction date', 'value date');
+  const descCol   = find('narration', 'description', 'particulars', 'transaction remarks', 'details', 'remarks', 'transaction');
+  const debitCol  = find('debit', 'withdrawal', 'dr', 'debit amount', 'withdrawal amount (inr)');
+  const creditCol = find('credit', 'deposit', 'cr', 'credit amount', 'deposit amount (inr)');
+  const amtCol    = debitCol === -1 ? find('amount') : -1;
+
+  if (dateCol === -1) return { error: '"Date" column not found in CSV.' };
+  if (debitCol === -1 && amtCol === -1) return { error: 'No Debit/Amount column found in CSV.' };
+
+  const monthMap = {};
+
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]).map(c => c.replace(/^"|"$/g, '').trim());
+
+    const txnDate = parsePaytmDate(row[dateCol]);
+    if (!txnDate) continue;
+
+    let amount = 0;
+    if (debitCol !== -1) {
+      const v = String(row[debitCol] || '').replace(/[₹,\s]/g, '');
+      amount = parseFloat(v) || 0;
+      if (amount <= 0) continue; // skip credits / zero rows
+    } else {
+      const v = String(row[amtCol] || '').replace(/[₹,\s]/g, '');
+      const parsed = parseFloat(v) || 0;
+      if (parsed === 0) continue;
+      amount = parsed < 0 ? Math.abs(parsed) : parsed; // signed or unsigned
+      // For unsigned amount columns with both debit & credit rows, skip credits
+      if (creditCol !== -1) {
+        const cr = parseFloat(String(row[creditCol] || '').replace(/[₹,\s]/g, '')) || 0;
+        if (cr > 0 && amount === cr) continue;
+      }
+    }
+
+    const desc     = descCol !== -1 ? String(row[descCol] || '').trim() : '';
+    const category = desc || 'Others';
+    const key      = `${txnDate.y}_${String(txnDate.m).padStart(2, '0')}`;
+
+    if (!monthMap[key]) monthMap[key] = { _total: 0 };
+    if (!monthMap[key][category]) monthMap[key][category] = { amount: 0, txns: 0 };
+    monthMap[key][category].amount += amount;
+    monthMap[key][category].txns   += 1;
+    monthMap[key]._total           += amount;
+  }
+
+  if (Object.keys(monthMap).length === 0)
+    return { error: 'No debit transactions found in the CSV.' };
+
+  const byMonth = {};
+  for (const [monthKey, data] of Object.entries(monthMap)) {
+    const { _total, ...catMap } = data;
+    const total      = Object.values(catMap).reduce((s, v) => s + v.amount, 0);
+    const categories = Object.entries(catMap)
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .map(([name, { amount, txns }]) => ({
+        name,
+        amount:  Math.round(amount),
+        txns,
+        icon:    categoryToIcon(name),
+        account: 'joint',
+        trend:   0,
+        pct:     total > 0 ? parseFloat(((amount / total) * 100).toFixed(1)) : 0,
+      }));
+    byMonth[monthKey] = { categories, total: Math.round(total) };
+  }
+
+  return { byMonth };
 }
 
 // ── Paytm date parser ───────────────────────────────────────────────────────
@@ -133,6 +250,7 @@ function parsePaytmExcel(arrayBuffer) {
     const absAmount = Math.abs(amount);
 
     const tag      = tagsCol    !== -1 ? String(row[tagsCol]    || '').trim() : '';
+    if (tag === '# Financial Services') continue;
     const details  = detailsCol !== -1 ? cleanTransactionDetail(String(row[detailsCol] || '')) : '';
     const remarks  = remarksCol !== -1 ? String(row[remarksCol] || '').trim() : '';
     const category = tag || details || remarks || 'Others';
@@ -224,30 +342,48 @@ const UpdateData = () => {
     }
   };
 
-  // ── File selected → parse & auto-save Paytm Excel ──────────────────────
+  // ── File selected → parse & save for ALL statement types ──────────────────
   const handleFileChange = (file) => {
     setStatementUpload(s => ({ ...s, file }));
-    if (!file || statementUpload.statementType !== 'Paytm') return;
+    if (!file) return;
+
+    const type = statementUpload.statementType;
+    const acct = statementUpload.account.toLowerCase();
+
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+      alert('PDF parsing is not supported. Please export your statement as a CSV file.');
+      setStatementUpload(s => ({ ...s, file: null }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const result = parsePaytmExcel(e.target.result);
+      let result;
+      if (type === 'Paytm') {
+        result = parsePaytmExcel(e.target.result);
+      } else {
+        result = parseGenericCSV(e.target.result);
+      }
+
       if (result.error) {
-        alert('Could not parse Paytm file: ' + result.error);
+        alert('Could not parse file: ' + result.error);
         setStatementUpload(s => ({ ...s, file: null }));
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
       }
 
       setLoading(true);
-      const account = statementUpload.account.toLowerCase();
       try {
-        for (const [monthKey, { categories }] of Object.entries(result.byMonth)) {
-          const tagged = categories.map(c => ({ ...c, account }));
+        for (const [monthKey, { categories, total }] of Object.entries(result.byMonth)) {
+          const tagged = categories.map(c => ({ ...c, account: acct }));
+          const accountEntries = total > 0
+            ? [{ account: acct, entryType: 'moneyOut', label: `${type} Import`, amount: total }]
+            : [];
           await fetch('/api/expenses', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ action: 'save', month: monthKey, categories: tagged }),
+            body:    JSON.stringify({ action: 'save', month: monthKey, categories: tagged, accountEntries }),
           });
         }
         setStatementUpload(s => ({ ...s, file: null }));
@@ -255,38 +391,13 @@ const UpdateData = () => {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 4000);
       } catch (err) {
-        console.error('Paytm import error:', err);
+        console.error('Statement import error:', err);
         alert('Failed to save. Please try again.');
       } finally {
         setLoading(false);
       }
     };
     reader.readAsArrayBuffer(file);
-  };
-
-  // ── Non-Paytm statement upload ──────────────────────────────────────────
-  const handleStatementUpload = async (e) => {
-    e.preventDefault();
-    if (statementUpload.statementType === 'Paytm') return;
-    setLoading(true);
-    setSuccess(false);
-    try {
-      const formData = new FormData();
-      formData.append('statement',     statementUpload.file);
-      formData.append('account',       statementUpload.account);
-      formData.append('statementType', statementUpload.statementType);
-      const response = await statementsAPI.upload(formData);
-      await statementsAPI.process(response.data.statement._id);
-      setSuccess(true);
-      setStatementUpload(s => ({ ...s, file: null }));
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error uploading statement:', error);
-      alert('Error uploading statement. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -410,7 +521,7 @@ const UpdateData = () => {
             <h3 className="text-xl font-semibold text-gray-900">Upload Statements</h3>
           </div>
 
-          <form onSubmit={handleStatementUpload} className="space-y-6">
+          <div className="space-y-6">
             {/* Row 1: Account · Statement Type */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -439,21 +550,23 @@ const UpdateData = () => {
               </div>
             </div>
 
-            {/* Paytm info banner */}
-            {statementUpload.statementType === 'Paytm' && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-                <span style={{ fontSize: 18 }}>📊</span>
-                <p className="text-sm text-blue-800">
-                  <span className="font-semibold">Paytm Excel Import — </span>
-                  Upload your Paytm transaction history (.xlsx). Month is detected automatically from transaction dates and categories are saved directly to the expense screen.
-                </p>
-              </div>
-            )}
+            {/* Info banner */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+              <span style={{ fontSize: 18 }}>📊</span>
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">
+                  {statementUpload.statementType === 'Paytm' ? 'Paytm Excel Import — ' : 'CSV Import — '}
+                </span>
+                {statementUpload.statementType === 'Paytm'
+                  ? 'Upload your Paytm transaction history (.xlsx). Month is detected automatically and categories are saved directly to the expense screen.'
+                  : 'Upload your statement as a CSV file. Transactions are parsed automatically and update both the category breakdown and account balance on the expense screen.'}
+              </p>
+            </div>
 
             {/* File upload zone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload File {statementUpload.statementType === 'Paytm' ? '(Excel .xlsx / .xls)' : '(PDF or CSV)'}
+                Upload File {statementUpload.statementType === 'Paytm' ? '(Excel .xlsx / .xls)' : '(CSV)'}
               </label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-sage-400 transition-colors">
                 <div className="space-y-1 text-center">
@@ -466,14 +579,14 @@ const UpdateData = () => {
                         type="file"
                         className="sr-only"
                         ref={fileInputRef}
-                        accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.pdf,.csv'}
+                        accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.csv'}
                         onChange={e => handleFileChange(e.target.files[0] || null)}
                       />
                     </label>
                     <p className="pl-1">or drag and drop</p>
                   </div>
                   <p className="text-xs text-gray-500">
-                    {statementUpload.statementType === 'Paytm' ? 'Excel file (.xlsx) up to 10 MB' : 'PDF or CSV up to 10 MB'}
+                    {statementUpload.statementType === 'Paytm' ? 'Excel file (.xlsx) up to 10 MB' : 'CSV file up to 10 MB'}
                   </p>
                   {statementUpload.file && (
                     <p className="text-sm text-sage-600 font-medium mt-2">{statementUpload.file.name}</p>
@@ -482,39 +595,25 @@ const UpdateData = () => {
               </div>
             </div>
 
-            {/* Action row */}
+            {/* Status row */}
             <div className="flex items-center gap-4">
-              {statementUpload.statementType !== 'Paytm' && (
-                <button type="submit" disabled={loading || !statementUpload.file} className="btn-primary flex items-center gap-2">
-                  {loading
-                    ? <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" /><span>Processing…</span></>
-                    : <><Upload size={20} /><span>Upload & Process</span></>}
-                </button>
-              )}
-
-              {statementUpload.statementType === 'Paytm' && loading && (
+              {loading && (
                 <div className="flex items-center gap-2 text-sage-600">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sage-600" />
-                  <span className="font-medium">Saving categories…</span>
+                  <span className="font-medium">Saving to expense screen…</span>
                 </div>
               )}
-
-              {statementUpload.statementType === 'Paytm' && !statementUpload.file && !success && !loading && (
-                <p className="text-sm text-gray-400">Select an Excel file to auto-import categories.</p>
+              {!loading && !statementUpload.file && !success && (
+                <p className="text-sm text-gray-400">Select a file to auto-import categories and update account balance.</p>
               )}
-
               {success && (
                 <div className="flex items-center gap-2 text-green-600">
                   <Check size={20} />
-                  <span className="font-medium">
-                    {statementUpload.statementType === 'Paytm'
-                      ? 'Categories saved to expense screen!'
-                      : 'Statement uploaded successfully!'}
-                  </span>
+                  <span className="font-medium">Categories and account balance saved to expense screen!</span>
                 </div>
               )}
             </div>
-          </form>
+          </div>
 
           <div className="mt-8 space-y-3">
             <div className="p-3 bg-green-50 rounded-lg flex items-center gap-2">

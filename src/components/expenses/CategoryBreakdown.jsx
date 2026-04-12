@@ -89,8 +89,10 @@ function recalcPct(cats) {
 
 function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChange }) {
   const [editingCat, setEditingCat] = useState(null); // null | "new" | cat object
-  const filtered = filter === "all" ? categories : categories.filter(c => c.account === filter);
-  const totalAmount = categories.reduce((s, c) => s + c.amount, 0);
+  const filtered = (filter === "all" ? categories : categories.filter(c => (c.account || '').toLowerCase() === filter))
+    .slice().sort((a, b) => b.amount - a.amount);
+  const totalAmount    = categories.reduce((s, c) => s + c.amount, 0);
+  const filteredTotal  = filtered.reduce((s, c) => s + c.amount, 0);
 
   const handleSave = (saved) => {
     let updated;
@@ -107,8 +109,15 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
+          {filter !== "all" && (
+            <span style={{ fontSize: 14, fontWeight: 700, color: (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
+              {fmt(filteredTotal)}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {["all", "joint", "anurag", "nidhi"].map(f => (
             <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#e5e7eb"}`, background: filter === f ? (f === "all" ? "#f0faf4" : ACCT_STYLES[f].bg) : "#fff", color: filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#6b7280" }}>
               {f === "all" ? "All" : ACCT_LABEL[f]}
@@ -120,7 +129,7 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
       </div>
       <div style={{ overflowY: "auto", flex: 1 }}>
         {filtered.map(cat => (
-          <div key={cat.name} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={`${cat.account || 'unknown'}-${cat.name}`} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ fontSize: 22, width: 36, textAlign: "center" }}>{cat.icon}</div>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -129,7 +138,7 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
                 <TrendBadge trend={cat.trend} />
               </div>
               <div style={{ background: "#f3f4f6", borderRadius: 4, height: 5 }}>
-                <div style={{ width: `${Math.min(cat.pct * 2.8, 100)}%`, height: "100%", borderRadius: 4, background: ACCT_STYLES[cat.account].color }} />
+                <div style={{ width: `${Math.min(cat.pct * 2.8, 100)}%`, height: "100%", borderRadius: 4, background: (ACCT_STYLES[cat.account] || ACCT_STYLES.joint).color }} />
               </div>
             </div>
             <div style={{ textAlign: "right", minWidth: 80 }}>
@@ -159,12 +168,23 @@ export function CategoryBreakdown({ categories, onCategoriesChange }) {
   const [filter, setFilter]     = useState("all");
   const [expanded, setExpanded] = useState(false);
 
+  const visibleCats   = (filter === "all" ? categories : categories.filter(c => (c.account || '').toLowerCase() === filter))
+    .slice().sort((a, b) => b.amount - a.amount);
+  const filteredTotal = visibleCats.reduce((s, c) => s + c.amount, 0);
+
   return (
     <>
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "20px 24px", display: "flex", flexDirection: "column", maxHeight: 420, boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
+            {filter !== "all" && (
+              <span style={{ fontSize: 14, fontWeight: 700, color: (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
+                {fmt(filteredTotal)}
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             {["all", "joint", "anurag", "nidhi"].map(f => (
               <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#e5e7eb"}`, background: filter === f ? (f === "all" ? "#f0faf4" : ACCT_STYLES[f].bg) : "#fff", color: filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#6b7280" }}>
                 {f === "all" ? "All" : ACCT_LABEL[f]}
@@ -174,8 +194,8 @@ export function CategoryBreakdown({ categories, onCategoriesChange }) {
           </div>
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {(filter === "all" ? categories : categories.filter(c => c.account === filter)).map(cat => (
-            <div key={cat.name} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12 }}>
+          {visibleCats.map(cat => (
+            <div key={`${cat.account || 'unknown'}-${cat.name}`} style={{ padding: "12px 0", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ fontSize: 22, width: 36, textAlign: "center" }}>{cat.icon}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -184,7 +204,7 @@ export function CategoryBreakdown({ categories, onCategoriesChange }) {
                   <TrendBadge trend={cat.trend} />
                 </div>
                 <div style={{ background: "#f3f4f6", borderRadius: 4, height: 5 }}>
-                  <div style={{ width: `${Math.min(cat.pct * 2.8, 100)}%`, height: "100%", borderRadius: 4, background: ACCT_STYLES[cat.account].color }} />
+                  <div style={{ width: `${Math.min(cat.pct * 2.8, 100)}%`, height: "100%", borderRadius: 4, background: (ACCT_STYLES[cat.account] || ACCT_STYLES.joint).color }} />
                 </div>
               </div>
               <div style={{ textAlign: "right", minWidth: 80 }}>

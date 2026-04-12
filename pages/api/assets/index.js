@@ -1,6 +1,4 @@
 import { kv } from '@vercel/kv';
-import fs from 'fs';
-import path from 'path';
 
 function getCurrentMonthKey() {
   const now = new Date();
@@ -41,44 +39,20 @@ async function getAllAssetsAggregated() {
   return Object.values(assetMap);
 }
 
-// On first deployment, seed KV from the bundled read-only JSON files in /data.
-async function seedAllFromFiles() {
-  const dataDir = path.join(process.cwd(), 'data');
-  try {
-    if (!fs.existsSync(dataDir)) return;
-    const files = fs.readdirSync(dataDir)
-      .filter(f => f.startsWith('assets_') && f.endsWith('.json'))
-      .sort();
-    for (const file of files) {
-      const monthKey = file.replace('assets_', '').replace('.json', '');
-      const data = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8'));
-      await kv.set(`assets:${monthKey}`, data);
-    }
-  } catch (e) {
-    console.error('Seed error:', e);
-  }
-}
-
 // Get or create the current month's KV entry.
 async function getOrCreateCurrentMonthData() {
   const monthKey = getCurrentMonthKey();
   let data = await kv.get(`assets:${monthKey}`);
 
   if (!data) {
-    // Try to seed from the bundled JSON file first (handles initial migration).
-    const filePath = path.join(process.cwd(), 'data', `assets_${monthKey}.json`);
-    if (fs.existsSync(filePath)) {
-      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } else {
-      const now = new Date();
-      data = {
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
-        date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-        lastUpdated: now.toISOString(),
-        assets: [],
-      };
-    }
+    const now = new Date();
+    data = {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+      lastUpdated: now.toISOString(),
+      assets: [],
+    };
     await kv.set(`assets:${monthKey}`, data);
   }
 
@@ -88,11 +62,6 @@ async function getOrCreateCurrentMonthData() {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      // Auto-seed from bundled JSON files on first deployment (KV is empty).
-      const keys = await getSortedKeys();
-      if (keys.length === 0) {
-        await seedAllFromFiles();
-      }
       const assets = await getAllAssetsAggregated();
       return res.status(200).json({ data: assets });
     }

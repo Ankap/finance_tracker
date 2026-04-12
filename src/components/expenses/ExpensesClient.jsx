@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TopStats }           from './TopStats';
 import { MoneyFlowBanner }    from './MoneyFlowBanner';
-import { AccountHealthCards } from './AccountHealthCards';
 import { AIInsights }         from './AIInsights';
 import { CategoryBreakdown }  from './CategoryBreakdown';
 import { IncomeEditModal }    from './IncomeEditModal';
@@ -143,19 +142,10 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
         <MoneyFlowBanner
           investable={investable}
           totalIncome={totalIncome}
-          sips={sips}
-          onSipsChange={(v) => { setSips(v); persist({ sips: v }); saveGlobalDefaults({ sips: v }); }}
           fixedExpenses={visibleFixed}
           onFixedExpensesChange={(v) => { const updated = [...v, ...hiddenFixed]; setFixedExpenses(updated); saveGlobalDefaults({ fixedExpenses: updated }); }}
           canEditFixed={true}
           month={data.month}
-          creditCards={creditCards}
-          onCreditCardsChange={(v) => { setCreditCards(v); persist({ creditCards: v }); }}
-        />
-
-        <AccountHealthCards
-          accounts={accounts}
-          onAccountsChange={(v) => { setAccounts(v); persist({ accounts: v }); }}
         />
 
         <div ref={categoryRef} className="expenses-bottom-row" style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>

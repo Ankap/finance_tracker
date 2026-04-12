@@ -1,6 +1,4 @@
 import { kv } from '@vercel/kv';
-import fs from 'fs';
-import path from 'path';
 
 function getMonthKey(date) {
   const year  = date.getFullYear();
@@ -19,53 +17,29 @@ function monthLabelToKey(label) {
   return getMonthKey(d);
 }
 
-// Seed KV from all bundled JSON files in /data on first deployment.
-async function seedAllFromFiles() {
-  const dataDir = path.join(process.cwd(), 'data');
-  try {
-    if (!fs.existsSync(dataDir)) return;
-    const files = fs.readdirSync(dataDir)
-      .filter(f => f.startsWith('expenses_') && f.endsWith('.json'))
-      .sort();
-    for (const file of files) {
-      const monthKey = file.replace('expenses_', '').replace('.json', '');
-      const data = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8'));
-      await kv.set(`expenses:${monthKey}`, data);
-    }
-  } catch (e) {
-    console.error('Expenses seed error:', e);
-  }
-}
-
 // Get or create the data entry for a given month key.
 async function getOrCreateMonthData(monthKey) {
   let data = await kv.get(`expenses:${monthKey}`);
 
   if (!data) {
-    // Try bundled JSON seed file first.
-    const filePath = path.join(process.cwd(), 'data', `expenses_${monthKey}.json`);
-    if (fs.existsSync(filePath)) {
-      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } else {
-      const [year, month] = monthKey.split('_').map(Number);
-      const monthLabel = new Date(year, month - 1, 1)
-        .toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-      data = {
-        year,
-        month,
-        monthLabel,
-        lastUpdated: new Date().toISOString(),
-        income: { anurag: { salary: 0, bonus: 0 }, nidhi: { salary: 0, bonus: 0 } },
-        sips: null,
-        expenses: { joint: 0, anurag: 0, nidhi: 0 },
-        lastMonthExpenses: 0,
-        accounts: {},
-        categories: [],
-        fixedExpenses: null,
-        creditCards: [],
-        aiInsights: [],
-      };
-    }
+    const [year, month] = monthKey.split('_').map(Number);
+    const monthLabel = new Date(year, month - 1, 1)
+      .toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+    data = {
+      year,
+      month,
+      monthLabel,
+      lastUpdated: new Date().toISOString(),
+      income: { anurag: { salary: 0, bonus: 0 }, nidhi: { salary: 0, bonus: 0 } },
+      sips: null,
+      expenses: { joint: 0, anurag: 0, nidhi: 0 },
+      lastMonthExpenses: 0,
+      accounts: {},
+      categories: [],
+      fixedExpenses: null,
+      creditCards: [],
+      aiInsights: [],
+    };
     await kv.set(`expenses:${monthKey}`, data);
   }
 
@@ -76,12 +50,6 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const { month } = req.query; // optional "March 2026" label or "2026_03" key
-
-      // Auto-seed on first deployment (KV is empty).
-      const allKeys = await kv.keys('expenses:*');
-      if (allKeys.length === 0) {
-        await seedAllFromFiles();
-      }
 
       let monthKey;
       if (month) {
@@ -119,6 +87,25 @@ export default async function handler(req, res) {
             const kept = (data.categories || []).filter(c => !incomingAccounts.has(c.account));
             snapshot.categories = [...kept, ...snapshot.categories];
           }
+        }
+
+        // Append account moneyIn/moneyOut entries without overriding the whole accounts object.
+        if (snapshot.accountEntries && Array.isArray(snapshot.accountEntries)) {
+          if (!data.accounts) data.accounts = {};
+          for (const entry of snapshot.accountEntries) {
+            const { account, entryType, label, amount } = entry;
+            if (!data.accounts[account]) {
+              const labels = { joint: 'Joint Account', anurag: "Anurag's Account", nidhi: "Nidhi's Account" };
+              data.accounts[account] = {
+                label: labels[account] || account,
+                opening: 0, moneyIn: [], moneyOut: [], ccBillPaid: 0, ccBillNote: null, ccSpends: null,
+              };
+            }
+            const arrKey = entryType === 'moneyIn' ? 'moneyIn' : 'moneyOut';
+            if (!Array.isArray(data.accounts[account][arrKey])) data.accounts[account][arrKey] = [];
+            data.accounts[account][arrKey].push({ label, amount });
+          }
+          delete snapshot.accountEntries; // prevent Object.assign from overriding accounts
         }
 
         Object.assign(data, snapshot);

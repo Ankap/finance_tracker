@@ -1,23 +1,15 @@
 import { kv } from '@vercel/kv';
-import fs from 'fs';
-import path from 'path';
-
-const SEED_PATH = path.join(process.cwd(), 'data', 'income.json');
 
 async function getIncomeData() {
   let data = await kv.get('income');
   if (!data) {
-    if (fs.existsSync(SEED_PATH)) {
-      data = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
-    } else {
-      data = {
-        anurag:        { salary: 0 },
-        nidhi:         { salary: 0 },
-        sips:          0,
-        fixedExpenses: [],
-        lastUpdated:   new Date().toISOString(),
-      };
-    }
+    data = {
+      anurag:        { salary: 0 },
+      nidhi:         { salary: 0 },
+      sips:          0,
+      fixedExpenses: [],
+      lastUpdated:   new Date().toISOString(),
+    };
     await kv.set('income', data);
   }
   return data;

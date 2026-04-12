@@ -138,16 +138,13 @@ export function AccountHealthCards({ accounts, onAccountsChange }) {
     <div>
       <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", marginBottom: 4 }}>Account Balances</div>
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 14 }}>
-        Opening → salary in → expenses out → closing balance.{" "}
+        Money in and out per account.{" "}
         <span style={{ color: "#92400e", fontWeight: 600 }}>CC bill payments excluded from expenses</span> — card spends captured from card statement to avoid double-counting.
       </div>
       <div className="account-health-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
         {Object.entries(accounts).map(([key, acct]) => {
-          const s        = ACCT_STYLES[key];
-          const totalIn  = acct.moneyIn.reduce((a, b) => a + b.amount, 0);
-          const totalOut = acct.moneyOut.reduce((a, b) => a + b.amount, 0);
-          const closing  = acct.opening + totalIn - totalOut - acct.ccBillPaid;
-          const isOpen   = expanded === key;
+          const s      = ACCT_STYLES[key];
+          const isOpen = expanded === key;
           return (
             <div key={key} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, overflow: "hidden" }}>
               <div style={{ background: s.light, borderBottom: "1px solid #e5e7eb", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -155,32 +152,25 @@ export function AccountHealthCards({ accounts, onAccountsChange }) {
                   <AccountPill account={key} />
                   <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 5 }}>{acct.ccBillPaid > 0 ? "💳 Has credit card" : "No credit card"}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginBottom: 4 }}>
-                    <button onClick={() => setEditingKey(key)} style={{ fontSize: 11, fontWeight: 600, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>✎ Edit</button>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Closing Balance</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: closing > 50000 ? "#166534" : "#d97706", letterSpacing: "-0.5px" }}>{fmt(closing)}</div>
-                </div>
+                <button onClick={() => setEditingKey(key)} style={{ fontSize: 11, fontWeight: 600, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>✎ Edit</button>
               </div>
               <div style={{ padding: "14px 18px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  <LedgerRow label="Opening balance" amount={acct.opening} color="#6b7280" />
                   {acct.moneyIn.map((m, i)  => <LedgerRow key={i} label={`+ ${m.label}`} amount={m.amount} color="#16a34a" />)}
                   {acct.moneyOut.map((m, i) => <LedgerRow key={i} label={`− ${m.label}`} amount={m.amount} color="#dc2626" />)}
+                  {acct.moneyIn.length === 0 && acct.moneyOut.length === 0 && (
+                    <div style={{ fontSize: 12, color: "#d1d5db", fontStyle: "italic" }}>No entries yet — click Edit to add.</div>
+                  )}
                   {acct.ccBillPaid > 0 && (
                     <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 10px", marginTop: 2 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div style={{ fontSize: 11, color: "#92400e", fontWeight: 600, flex: 1, lineHeight: 1.4 }}>
-                          💳 CC bill ({fmt(acct.ccBillPaid)}) — account deducted but <em>not counted as expense</em>
+                          💳 CC bill ({fmt(acct.ccBillPaid)}) — deducted from account but <em>not counted as expense</em>
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginLeft: 8 }}>−{fmt(acct.ccBillPaid)}</span>
                       </div>
                     </div>
                   )}
-                  <div style={{ borderTop: "1px dashed #e5e7eb", paddingTop: 8, marginTop: 4 }}>
-                    <LedgerRow label="= Closing balance" amount={closing} color={closing > 50000 ? "#166534" : "#d97706"} bold />
-                  </div>
                 </div>
                 {acct.ccSpends && (
                   <>
