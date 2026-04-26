@@ -80,16 +80,32 @@ export default async function handler(req, res) {
       if (action === 'save') {
         const { month: _m, action: _a, ...snapshot } = req.body;
 
-        // Merge categories by account so uploading one account doesn't wipe others.
+        // Merge categories by account+statementType so uploading one statement type
+        // doesn't wipe categories from a different statement type for the same account.
         if (snapshot.categories && Array.isArray(snapshot.categories) && snapshot.categories.length > 0) {
-          const incomingAccounts = new Set(snapshot.categories.map(c => c.account).filter(Boolean));
-          if (incomingAccounts.size > 0) {
-            const kept = (data.categories || []).filter(c => !incomingAccounts.has(c.account));
-            snapshot.categories = [...kept, ...snapshot.categories];
+          const incoming = snapshot.categories;
+          const hasStatementType = incoming.some(c => c.statementType);
+          if (hasStatementType) {
+            // Fine-grained merge: keep categories that don't match the incoming account+statementType pair
+            const incomingKeys = new Set(
+              incoming.filter(c => c.account && c.statementType).map(c => `${c.account}|${c.statementType}`)
+            );
+            const kept = (data.categories || []).filter(c =>
+              !(c.statementType && incomingKeys.has(`${c.account}|${c.statementType}`))
+            );
+            snapshot.categories = [...kept, ...incoming];
+          } else {
+            // Legacy path: merge by account only
+            const incomingAccounts = new Set(incoming.map(c => c.account).filter(Boolean));
+            if (incomingAccounts.size > 0) {
+              const kept = (data.categories || []).filter(c => !incomingAccounts.has(c.account));
+              snapshot.categories = [...kept, ...incoming];
+            }
           }
         }
 
         // Append account moneyIn/moneyOut entries without overriding the whole accounts object.
+        // Deduplicate by label so re-uploading the same statement type replaces the old entry.
         if (snapshot.accountEntries && Array.isArray(snapshot.accountEntries)) {
           if (!data.accounts) data.accounts = {};
           for (const entry of snapshot.accountEntries) {
@@ -103,6 +119,8 @@ export default async function handler(req, res) {
             }
             const arrKey = entryType === 'moneyIn' ? 'moneyIn' : 'moneyOut';
             if (!Array.isArray(data.accounts[account][arrKey])) data.accounts[account][arrKey] = [];
+            // Remove any existing entry with the same label before pushing (avoids duplicates on re-upload)
+            data.accounts[account][arrKey] = data.accounts[account][arrKey].filter(e => e.label !== label);
             data.accounts[account][arrKey].push({ label, amount });
           }
           delete snapshot.accountEntries; // prevent Object.assign from overriding accounts

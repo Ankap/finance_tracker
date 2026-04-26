@@ -142,22 +142,6 @@ const staticTransactions = [
   { _id: 't12', description: 'Gift for Mom', amount: 3000, category: 'Gifts', type: 'Expense', date: '2026-02-04', paymentMethod: 'UPI' },
 ];
 
-const staticSnapshots = [
-  { _id: 's1', month: '2025-03-01', date: '2025-03-01', netWorth: 1120000, totalAssets: 1120000, snapshot: { income: { total: 185000 }, expenses: { total: 98000 }, savings: { rate: 47, amount: 87000 } }, growth: { netWorthChange: 42000, netWorthChangePercentage: 3.9, expenseChange: -2000 } },
-  { _id: 's2', month: '2025-04-01', date: '2025-04-01', netWorth: 1165000, totalAssets: 1165000, snapshot: { income: { total: 185000 }, expenses: { total: 95000 }, savings: { rate: 48.6, amount: 90000 } }, growth: { netWorthChange: 45000, netWorthChangePercentage: 4.0, expenseChange: -3000 } },
-  { _id: 's3', month: '2025-05-01', date: '2025-05-01', netWorth: 1210000, totalAssets: 1210000, snapshot: { income: { total: 190000 }, expenses: { total: 102000 }, savings: { rate: 46.3, amount: 88000 } }, growth: { netWorthChange: 45000, netWorthChangePercentage: 3.9, expenseChange: 7000 } },
-  { _id: 's4', month: '2025-06-01', date: '2025-06-01', netWorth: 1260000, totalAssets: 1260000, snapshot: { income: { total: 190000 }, expenses: { total: 94000 }, savings: { rate: 50.5, amount: 96000 } }, growth: { netWorthChange: 50000, netWorthChangePercentage: 4.1, expenseChange: -8000 } },
-  { _id: 's5', month: '2025-07-01', date: '2025-07-01', netWorth: 1305000, totalAssets: 1305000, snapshot: { income: { total: 195000 }, expenses: { total: 99000 }, savings: { rate: 49.2, amount: 96000 } }, growth: { netWorthChange: 45000, netWorthChangePercentage: 3.6, expenseChange: 5000 } },
-  { _id: 's6', month: '2025-08-01', date: '2025-08-01', netWorth: 1350000, totalAssets: 1350000, snapshot: { income: { total: 195000 }, expenses: { total: 97000 }, savings: { rate: 50.3, amount: 98000 } }, growth: { netWorthChange: 45000, netWorthChangePercentage: 3.4, expenseChange: -2000 } },
-  { _id: 's7', month: '2025-09-01', date: '2025-09-01', netWorth: 1400000, totalAssets: 1400000, snapshot: { income: { total: 200000 }, expenses: { total: 105000 }, savings: { rate: 47.5, amount: 95000 } }, growth: { netWorthChange: 50000, netWorthChangePercentage: 3.7, expenseChange: 8000 } },
-  { _id: 's8', month: '2025-10-01', date: '2025-10-01', netWorth: 1455000, totalAssets: 1455000, snapshot: { income: { total: 200000 }, expenses: { total: 92000 }, savings: { rate: 54, amount: 108000 } }, growth: { netWorthChange: 55000, netWorthChangePercentage: 3.9, expenseChange: -13000 } },
-  { _id: 's9', month: '2025-11-01', date: '2025-11-01', netWorth: 1510000, totalAssets: 1510000, snapshot: { income: { total: 200000 }, expenses: { total: 98000 }, savings: { rate: 51, amount: 102000 } }, growth: { netWorthChange: 55000, netWorthChangePercentage: 3.8, expenseChange: 6000 } },
-  { _id: 's10', month: '2025-12-01', date: '2025-12-01', netWorth: 1570000, totalAssets: 1570000, snapshot: { income: { total: 205000 }, expenses: { total: 110000 }, savings: { rate: 46.3, amount: 95000 } }, growth: { netWorthChange: 60000, netWorthChangePercentage: 4.0, expenseChange: 12000 } },
-  { _id: 's11', month: '2026-01-01', date: '2026-01-01', netWorth: 1625000, totalAssets: 1625000, snapshot: { income: { total: 205000 }, expenses: { total: 96000 }, savings: { rate: 53.2, amount: 109000 } }, growth: { netWorthChange: 55000, netWorthChangePercentage: 3.5, expenseChange: -14000 } },
-  { _id: 's12', month: '2026-02-01', date: '2026-02-01', netWorth: 1675000, totalAssets: 1675000, snapshot: { income: { total: 210000 }, expenses: { total: 95000 }, savings: { rate: 54.8, amount: 115000 } }, growth: { netWorthChange: 50000, netWorthChangePercentage: 3.1, expenseChange: -1000 } },
-];
-
-const latestSnapshot = staticSnapshots[staticSnapshots.length - 1];
 
 const netWorthData = {
   totalNetWorth: 1675000,
@@ -399,9 +383,9 @@ export const transactionsAPI = {
 };
 
 export const snapshotsAPI = {
-  getAll: () => Promise.resolve({ data: staticSnapshots }),
-  getLatest: () => Promise.resolve({ data: latestSnapshot }),
-  getById: (id) => Promise.resolve({ data: staticSnapshots.find(s => s._id === id) }),
+  getAll: () => Promise.resolve({ data: [] }),
+  getLatest: () => Promise.resolve({ data: null }),
+  getById: () => Promise.resolve({ data: null }),
   create: () => Promise.resolve({ data: { success: true } }),
   update: () => Promise.resolve({ data: { success: true } }),
   delete: () => Promise.resolve({ data: { success: true } }),

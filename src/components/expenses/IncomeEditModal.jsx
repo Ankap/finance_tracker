@@ -3,13 +3,13 @@ import { ACCT_STYLES } from '../../lib/expenses.types';
 
 export function IncomeEditModal({ month, income, onSave, onClose }) {
   const [vals, setVals] = useState({
-    anuragSalary: income.anurag.salary,
-    anuragBonus:  income.anurag.bonus,
-    nidhiSalary:  income.nidhi.salary,
-    nidhiBonus:   income.nidhi.bonus,
+    anuragSalary: String(income.anurag.salary),
+    anuragBonus:  String(income.anurag.bonus),
+    nidhiSalary:  String(income.nidhi.salary),
+    nidhiBonus:   String(income.nidhi.bonus),
   });
 
-  const set = (k, v) => setVals(p => ({ ...p, [k]: Number(v) || 0 }));
+  const set = (k, v) => setVals(p => ({ ...p, [k]: v }));
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
@@ -41,7 +41,12 @@ export function IncomeEditModal({ month, income, onSave, onClose }) {
         ))}
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Cancel</button>
-          <button onClick={() => onSave(vals)} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: "#3d6b4f", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer" }}>Save Income for {month}</button>
+          <button onClick={() => onSave({
+            anuragSalary: Number(vals.anuragSalary) || 0,
+            anuragBonus:  Number(vals.anuragBonus)  || 0,
+            nidhiSalary:  Number(vals.nidhiSalary)  || 0,
+            nidhiBonus:   Number(vals.nidhiBonus)   || 0,
+          })} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: "#3d6b4f", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer" }}>Save Income for {month}</button>
         </div>
       </div>
     </div>

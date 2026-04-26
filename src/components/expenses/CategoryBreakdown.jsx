@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import { AccountPill, TrendBadge } from './Primitives';
 import { ACCT_STYLES, ACCT_LABEL, fmt } from '../../lib/expenses.types';
 
+// Full Indian-locale amount: ₹29,800 or −₹500
+const fmtFull = (n) => {
+  if (n == null) return '₹0';
+  const abs = Math.abs(Math.round(n));
+  return n < 0 ? `−₹${abs.toLocaleString('en-IN')}` : `₹${abs.toLocaleString('en-IN')}`;
+};
+
 const ICONS = ["🏠","🛍️","🛒","🛡️","⛽","💡","🍽️","🎁","📱","✈️","🏥","🎓","🚗","💊","🎬","🏋️","🍕","☕","🐾","🌐"];
 
 function CategoryModal({ cat, onSave, onClose, totalAmount }) {
@@ -111,11 +118,9 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
-          {filter !== "all" && (
-            <span style={{ fontSize: 14, fontWeight: 700, color: (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
-              {fmt(filteredTotal)}
-            </span>
-          )}
+          <span style={{ fontSize: 14, fontWeight: 700, color: filter === "all" ? "#3d6b4f" : (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
+            {fmtFull(filteredTotal)}
+          </span>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {["all", "joint", "anurag", "nidhi"].map(f => (
@@ -142,7 +147,7 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
               </div>
             </div>
             <div style={{ textAlign: "right", minWidth: 80 }}>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{fmt(cat.amount)}</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{fmtFull(cat.amount)}</div>
               <div style={{ fontSize: 12, color: "#9ca3af" }}>{cat.txns} txn{cat.txns !== 1 ? "s" : ""} · {cat.pct}%</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -178,19 +183,28 @@ export function CategoryBreakdown({ categories, onCategoriesChange }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Category Breakdown</div>
-            {filter !== "all" && (
-              <span style={{ fontSize: 14, fontWeight: 700, color: (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
-                {fmt(filteredTotal)}
-              </span>
-            )}
+            <span style={{ fontSize: 14, fontWeight: 700, color: filter === "all" ? "#3d6b4f" : (ACCT_STYLES[filter] || ACCT_STYLES.joint).color }}>
+              {fmtFull(filteredTotal)}
+            </span>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            {["all", "joint", "anurag", "nidhi"].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: `1px solid ${filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#e5e7eb"}`, background: filter === f ? (f === "all" ? "#f0faf4" : ACCT_STYLES[f].bg) : "#fff", color: filter === f ? (f === "all" ? "#3d6b4f" : ACCT_STYLES[f].color) : "#6b7280" }}>
-                {f === "all" ? "All" : ACCT_LABEL[f]}
-              </button>
-            ))}
-            <button onClick={() => setExpanded(true)} title="Expand" style={{ fontSize: 13, lineHeight: 1, background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", color: "#6b7280", padding: "3px 8px", marginLeft: 4 }}>⤢</button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <select
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: "4px 8px", borderRadius: 8, cursor: "pointer",
+                border: `1px solid ${filter === "all" ? "#3d6b4f" : (ACCT_STYLES[filter] || ACCT_STYLES.joint).color}`,
+                background: filter === "all" ? "#f0faf4" : (ACCT_STYLES[filter] || ACCT_STYLES.joint).bg,
+                color: filter === "all" ? "#3d6b4f" : (ACCT_STYLES[filter] || ACCT_STYLES.joint).color,
+                outline: "none", appearance: "auto",
+              }}
+            >
+              <option value="all">All</option>
+              {["joint", "anurag", "nidhi"].map(f => (
+                <option key={f} value={f}>{ACCT_LABEL[f]}</option>
+              ))}
+            </select>
+            <button onClick={() => setExpanded(true)} title="Expand" style={{ fontSize: 13, lineHeight: 1, background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", color: "#6b7280", padding: "3px 8px" }}>⤢</button>
           </div>
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
@@ -208,7 +222,7 @@ export function CategoryBreakdown({ categories, onCategoriesChange }) {
                 </div>
               </div>
               <div style={{ textAlign: "right", minWidth: 80 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{fmt(cat.amount)}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>{fmtFull(cat.amount)}</div>
                 <div style={{ fontSize: 12, color: "#9ca3af" }}>{cat.txns} txn{cat.txns !== 1 ? "s" : ""} · {cat.pct}%</div>
               </div>
             </div>

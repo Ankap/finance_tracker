@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, TrendingUp, Target, FileText, Check, Sparkles } from 'lucide-react';
 import { assetsAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 // ── Paytm category → icon mapping ──────────────────────────────────────────
 const CATEGORY_ICONS = {
@@ -48,7 +49,8 @@ function parseCSVLine(line) {
 }
 
 // ── Generic CSV parser for Bank Statement / Credit Card / CSV File ───────────
-function parseGenericCSV(arrayBuffer) {
+function parseGenericCSV(arrayBuffer, options = {}) {
+  const { excludeCreditCategories = [] } = options;
   const text = new TextDecoder('utf-8').decode(arrayBuffer);
   const lines = text.split(/\r?\n/).filter(l => l.trim());
 
@@ -82,13 +84,17 @@ function parseGenericCSV(arrayBuffer) {
 
   const dateCol   = find('date', 'txn date', 'transaction date', 'value date');
   const descCol   = find('narration', 'description', 'particulars', 'transaction remarks', 'details', 'remarks', 'transaction');
-  const debitCol  = find('debit', 'withdrawal', 'dr', 'debit amount', 'withdrawal amount (inr)');
-  const creditCol = find('credit', 'deposit', 'cr', 'credit amount', 'deposit amount (inr)');
+  const debitCol  = find('debit', 'withdrawal', 'debit amount', 'withdrawal amount (inr)');
+  const creditCol = find('credit', 'deposit', 'credit amount', 'deposit amount (inr)');
+  // Separate debit-indicator cols that might collide with Dr/Cr type col
   const amtCol    = debitCol === -1 ? find('amount') : -1;
+  // Dr/Cr type indicator column (e.g. HDFC CC "Type" column with "Dr"/"Cr" values)
+  const typeCol   = find('type', 'cr/dr', 'dr/cr', 'txn type', 'transaction type');
 
   if (dateCol === -1) return { error: '"Date" column not found in CSV.' };
   if (debitCol === -1 && amtCol === -1) return { error: 'No Debit/Amount column found in CSV.' };
 
+  // monthMap: { 'YYYY_MM': { catMap: { name: { amount, txns } }, totalDebits, totalCredits } }
   const monthMap = {};
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
@@ -97,20 +103,41 @@ function parseGenericCSV(arrayBuffer) {
     const txnDate = parsePaytmDate(row[dateCol]);
     if (!txnDate) continue;
 
-    let amount = 0;
+    let debitAmt  = 0;
+    let creditAmt = 0;
+
     if (debitCol !== -1) {
-      const v = String(row[debitCol] || '').replace(/[₹,\s]/g, '');
-      amount = parseFloat(v) || 0;
-      if (amount <= 0) continue; // skip credits / zero rows
+      // Separate Debit / Credit columns (classic bank statement format)
+      const dv = String(row[debitCol] || '').replace(/[₹,\s]/g, '');
+      debitAmt = parseFloat(dv) || 0;
+      if (creditCol !== -1) {
+        const cv = String(row[creditCol] || '').replace(/[₹,\s]/g, '');
+        creditAmt = parseFloat(cv) || 0;
+      }
     } else {
-      const v = String(row[amtCol] || '').replace(/[₹,\s]/g, '');
+      // Single Amount column — use Dr/Cr type indicator if present, else use sign
+      const v      = String(row[amtCol] || '').replace(/[₹,\s]/g, '');
       const parsed = parseFloat(v) || 0;
       if (parsed === 0) continue;
-      amount = parsed < 0 ? Math.abs(parsed) : parsed; // signed or unsigned
-      // For unsigned amount columns with both debit & credit rows, skip credits
-      if (creditCol !== -1) {
-        const cr = parseFloat(String(row[creditCol] || '').replace(/[₹,\s]/g, '')) || 0;
-        if (cr > 0 && amount === cr) continue;
+
+      if (typeCol !== -1) {
+        const typeStr = String(row[typeCol] || '').toLowerCase().trim();
+        if (typeStr === 'cr' || typeStr === 'credit' || typeStr.startsWith('cr')) {
+          creditAmt = Math.abs(parsed);
+        } else {
+          debitAmt = Math.abs(parsed);
+        }
+      } else if (parsed < 0) {
+        creditAmt = Math.abs(parsed);
+      } else {
+        // Unsigned amount — treat as debit unless matching credit column value
+        if (creditCol !== -1) {
+          const cr = parseFloat(String(row[creditCol] || '').replace(/[₹,\s]/g, '')) || 0;
+          if (cr > 0 && parsed === cr) { creditAmt = cr; }
+          else { debitAmt = parsed; }
+        } else {
+          debitAmt = parsed;
+        }
       }
     }
 
@@ -118,20 +145,28 @@ function parseGenericCSV(arrayBuffer) {
     const category = desc || 'Others';
     const key      = `${txnDate.y}_${String(txnDate.m).padStart(2, '0')}`;
 
-    if (!monthMap[key]) monthMap[key] = { _total: 0 };
-    if (!monthMap[key][category]) monthMap[key][category] = { amount: 0, txns: 0 };
-    monthMap[key][category].amount += amount;
-    monthMap[key][category].txns   += 1;
-    monthMap[key]._total           += amount;
+    if (!monthMap[key]) monthMap[key] = { catMap: {}, totalDebits: 0, totalCredits: 0 };
+
+    if (debitAmt > 0) {
+      if (!monthMap[key].catMap[category]) monthMap[key].catMap[category] = { amount: 0, txns: 0 };
+      monthMap[key].catMap[category].amount += debitAmt;
+      monthMap[key].catMap[category].txns   += 1;
+      monthMap[key].totalDebits             += debitAmt;
+    }
+    if (creditAmt > 0) {
+      const skipCredit = excludeCreditCategories.some(pat =>
+        desc.toUpperCase().includes(pat.toUpperCase())
+      );
+      if (!skipCredit) monthMap[key].totalCredits += creditAmt;
+    }
   }
 
   if (Object.keys(monthMap).length === 0)
     return { error: 'No debit transactions found in the CSV.' };
 
   const byMonth = {};
-  for (const [monthKey, data] of Object.entries(monthMap)) {
-    const { _total, ...catMap } = data;
-    const total      = Object.values(catMap).reduce((s, v) => s + v.amount, 0);
+  for (const [monthKey, { catMap, totalDebits, totalCredits }] of Object.entries(monthMap)) {
+    const netAmount  = Math.max(0, totalDebits - totalCredits);
     const categories = Object.entries(catMap)
       .sort((a, b) => b[1].amount - a[1].amount)
       .map(([name, { amount, txns }]) => ({
@@ -141,9 +176,15 @@ function parseGenericCSV(arrayBuffer) {
         icon:    categoryToIcon(name),
         account: 'joint',
         trend:   0,
-        pct:     total > 0 ? parseFloat(((amount / total) * 100).toFixed(1)) : 0,
+        pct:     totalDebits > 0 ? parseFloat(((amount / totalDebits) * 100).toFixed(1)) : 0,
       }));
-    byMonth[monthKey] = { categories, total: Math.round(total) };
+    byMonth[monthKey] = {
+      categories,
+      total:        Math.round(totalDebits),
+      totalDebits:  Math.round(totalDebits),
+      totalCredits: Math.round(totalCredits),
+      netAmount:    Math.round(netAmount),
+    };
   }
 
   return { byMonth };
@@ -280,7 +321,13 @@ function parsePaytmExcel(arrayBuffer) {
         trend:   0,
         pct:     total > 0 ? parseFloat(((amount / total) * 100).toFixed(1)) : 0,
       }));
-    byMonth[monthKey] = { categories, total: Math.round(total) };
+    byMonth[monthKey] = {
+      categories,
+      total:        Math.round(total),
+      totalDebits:  Math.round(total),
+      totalCredits: 0,
+      netAmount:    Math.round(total),
+    };
   }
 
   return { byMonth, sheet: sheetName };
@@ -288,9 +335,13 @@ function parsePaytmExcel(arrayBuffer) {
 
 // ── Main Component ───────────────────────────────────────────────────────────
 const UpdateData = () => {
+  const navigate                  = useNavigate();
   const [activeTab, setActiveTab] = useState('assets');
   const [loading, setLoading]     = useState(false);
   const [success, setSuccess]     = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState(null);  // { type, acct, result, conflictMonths }
+  const [parsedPreview, setParsedPreview] = useState(null);  // { type, acct, result }
   const fileInputRef              = useRef(null);
 
   // Asset form state
@@ -342,62 +393,157 @@ const UpdateData = () => {
     }
   };
 
-  // ── File selected → parse & save for ALL statement types ──────────────────
-  const handleFileChange = (file) => {
-    setStatementUpload(s => ({ ...s, file }));
+  // ── Save parsed statement data to the API ─────────────────────────────────
+  const doSave = async (type, acct, result) => {
+    setLoading(true);
+    try {
+      for (const [monthKey, { categories, netAmount, totalDebits, totalCredits }] of Object.entries(result.byMonth)) {
+        const tagged = categories.map(c => ({ ...c, account: acct, statementType: type }));
+        // Add a deduction entry so category amounts sum to netAmount, not totalDebits
+        if (totalCredits > 0) {
+          tagged.push({
+            name: 'Payments / Refunds',
+            amount: -Math.round(totalCredits),
+            txns: 0,
+            icon: '↩️',
+            account: acct,
+            statementType: type,
+            trend: 0,
+            pct: 0,
+          });
+        }
+        const saveAmount  = netAmount ?? totalDebits ?? 0;
+        const accountEntries = saveAmount > 0
+          ? [{ account: acct, entryType: 'moneyOut', label: `${type} Import`, amount: saveAmount }]
+          : [];
+        await fetch('/api/expenses', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ action: 'save', month: monthKey, categories: tagged, accountEntries }),
+        });
+      }
+      setStatementUpload(s => ({ ...s, file: null }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setPendingUpload(null);
+      setParsedPreview(null);
+      setUploadSuccess(true);
+      setTimeout(() => { setUploadSuccess(false); navigate('/expenses'); }, 2000);
+    } catch (err) {
+      console.error('Statement import error:', err);
+      alert('Failed to save. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelUpload = () => {
+    setPendingUpload(null);
+    setParsedPreview(null);
+    setStatementUpload(s => ({ ...s, file: null }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ── File selected — parse immediately and show review screen ─────────────
+  const handleFileSelect = (file) => {
     if (!file) return;
-
-    const type = statementUpload.statementType;
-    const acct = statementUpload.account.toLowerCase();
-
     if (file.name.toLowerCase().endsWith('.pdf')) {
       alert('PDF parsing is not supported. Please export your statement as a CSV file.');
-      setStatementUpload(s => ({ ...s, file: null }));
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
+    setParsedPreview(null);
+    setStatementUpload(s => ({ ...s, file }));
 
+    const type = statementUpload.statementType;
+    const acct = statementUpload.account.toLowerCase();
+    setLoading(true);
     const reader = new FileReader();
-    reader.onload = async (e) => {
-      let result;
-      if (type === 'Paytm') {
-        result = parsePaytmExcel(e.target.result);
-      } else {
-        result = parseGenericCSV(e.target.result);
-      }
-
+    reader.onload = (e) => {
+      const result = type === 'Paytm'
+        ? parsePaytmExcel(e.target.result)
+        : parseGenericCSV(
+            e.target.result,
+            type.toLowerCase().includes('credit card') ? { excludeCreditCategories: ['payment'] } : {}
+          );
       if (result.error) {
         alert('Could not parse file: ' + result.error);
         setStatementUpload(s => ({ ...s, file: null }));
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setLoading(false);
         return;
       }
 
-      setLoading(true);
-      try {
-        for (const [monthKey, { categories, total }] of Object.entries(result.byMonth)) {
-          const tagged = categories.map(c => ({ ...c, account: acct }));
-          const accountEntries = total > 0
-            ? [{ account: acct, entryType: 'moneyOut', label: `${type} Import`, amount: total }]
-            : [];
-          await fetch('/api/expenses', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ action: 'save', month: monthKey, categories: tagged, accountEntries }),
-          });
+      // For credit card statements, merge ALL transactions into the current month
+      if (type.toLowerCase().includes('credit card')) {
+        const now = new Date();
+        const currentKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
+        let mergedTotalDebits  = 0;
+        let mergedTotalCredits = 0;
+        const catMap = {};
+        for (const monthData of Object.values(result.byMonth)) {
+          mergedTotalDebits  += monthData.totalDebits;
+          mergedTotalCredits += monthData.totalCredits;
+          for (const cat of monthData.categories) {
+            if (!catMap[cat.name]) catMap[cat.name] = { amount: 0, txns: 0, icon: cat.icon };
+            catMap[cat.name].amount += cat.amount;
+            catMap[cat.name].txns   += cat.txns;
+          }
         }
-        setStatementUpload(s => ({ ...s, file: null }));
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 4000);
-      } catch (err) {
-        console.error('Statement import error:', err);
-        alert('Failed to save. Please try again.');
-      } finally {
-        setLoading(false);
+        const mergedCategories = Object.entries(catMap)
+          .sort((a, b) => b[1].amount - a[1].amount)
+          .map(([name, { amount, txns, icon }]) => ({
+            name, amount, txns, icon,
+            account: acct,
+            trend: 0,
+            pct: mergedTotalDebits > 0 ? parseFloat(((amount / mergedTotalDebits) * 100).toFixed(1)) : 0,
+          }));
+        const netAmount = Math.max(0, mergedTotalDebits - mergedTotalCredits);
+        result.byMonth = {
+          [currentKey]: {
+            categories:   mergedCategories,
+            total:        Math.round(mergedTotalDebits),
+            totalDebits:  Math.round(mergedTotalDebits),
+            totalCredits: Math.round(mergedTotalCredits),
+            netAmount:    Math.round(netAmount),
+          },
+        };
       }
+
+      setParsedPreview({ type, acct, result });
+      setLoading(false);
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  // ── Confirm preview → conflict-check → save ───────────────────────────────
+  const handleConfirmPreview = async () => {
+    if (!parsedPreview) return;
+    const { type, acct, result } = parsedPreview;
+    setLoading(true);
+    try {
+      const conflictMonths = [];
+      for (const monthKey of Object.keys(result.byMonth)) {
+        const resp = await fetch(`/api/expenses?month=${monthKey}`);
+        if (resp.ok) {
+          const { data: existing } = await resp.json();
+          const hasConflict = (existing.categories || []).some(
+            c => c.account === acct && c.statementType === type
+          );
+          if (hasConflict) conflictMonths.push(existing.monthLabel || monthKey);
+        }
+      }
+      if (conflictMonths.length > 0) {
+        setParsedPreview(null);
+        setPendingUpload({ type, acct, result, conflictMonths });
+        setLoading(false);
+        return;
+      }
+      await doSave(type, acct, result);
+    } catch (err) {
+      console.error('Statement import error:', err);
+      alert('Failed to save. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -522,97 +668,212 @@ const UpdateData = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Row 1: Account · Statement Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
-                <select
-                  value={statementUpload.account}
-                  onChange={e => setStatementUpload(s => ({ ...s, account: e.target.value }))}
-                  className="input-field"
-                >
-                  <option>Joint</option><option>Anurag</option><option>Nidhi</option>
-                </select>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Statement Type</label>
-                <select
-                  value={statementUpload.statementType}
-                  onChange={e => setStatementUpload(s => ({ ...s, statementType: e.target.value, file: null }))}
-                  className="input-field"
-                >
-                  <option>Bank Statement</option>
-                  <option>Credit Card</option>
-                  <option>Paytm</option>
-                  <option>CSV File</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Info banner */}
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-              <span style={{ fontSize: 18 }}>📊</span>
-              <p className="text-sm text-blue-800">
-                <span className="font-semibold">
-                  {statementUpload.statementType === 'Paytm' ? 'Paytm Excel Import — ' : 'CSV Import — '}
+            {/* ── Loading spinner ── */}
+            {loading && (
+              <div className="flex items-center gap-2 text-sage-600">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sage-600" />
+                <span className="font-medium">
+                  {parsedPreview ? 'Saving to expense screen…' : 'Processing file…'}
                 </span>
-                {statementUpload.statementType === 'Paytm'
-                  ? 'Upload your Paytm transaction history (.xlsx). Month is detected automatically and categories are saved directly to the expense screen.'
-                  : 'Upload your statement as a CSV file. Transactions are parsed automatically and update both the category breakdown and account balance on the expense screen.'}
-              </p>
-            </div>
+              </div>
+            )}
 
-            {/* File upload zone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload File {statementUpload.statementType === 'Paytm' ? '(Excel .xlsx / .xls)' : '(CSV)'}
-              </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-sage-400 transition-colors">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-sage-600 hover:text-sage-500">
-                      <span>Upload a file</span>
-                      <input
-                        id="file-upload"
-                        type="file"
-                        className="sr-only"
-                        ref={fileInputRef}
-                        accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.csv'}
-                        onChange={e => handleFileChange(e.target.files[0] || null)}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {statementUpload.statementType === 'Paytm' ? 'Excel file (.xlsx) up to 10 MB' : 'CSV file up to 10 MB'}
-                  </p>
-                  {statementUpload.file && (
-                    <p className="text-sm text-sage-600 font-medium mt-2">{statementUpload.file.name}</p>
-                  )}
+            {/* ── Success banner ── */}
+            {uploadSuccess && (
+              <div className="flex items-center gap-2 text-green-600">
+                <Check size={20} />
+                <span className="font-medium">Upload successful! Redirecting to expenses…</span>
+              </div>
+            )}
+
+            {/* ── Conflict / override confirmation ── */}
+            {pendingUpload && !loading && (
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg space-y-3">
+                <p className="text-sm font-semibold text-amber-800">
+                  Data already exists for <span className="font-bold">{pendingUpload.type}</span> / <span className="font-bold capitalize">{pendingUpload.acct}</span> in:
+                </p>
+                <ul className="list-disc list-inside text-sm text-amber-700 space-y-0.5">
+                  {pendingUpload.conflictMonths.map(m => <li key={m}>{m}</li>)}
+                </ul>
+                <p className="text-sm text-amber-700">Do you want to override the existing data for these months?</p>
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => doSave(pendingUpload.type, pendingUpload.acct, pendingUpload.result)}
+                    className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
+                  >
+                    Yes, Override
+                  </button>
+                  <button
+                    onClick={cancelUpload}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Status row */}
-            <div className="flex items-center gap-4">
-              {loading && (
-                <div className="flex items-center gap-2 text-sage-600">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sage-600" />
-                  <span className="font-medium">Saving to expense screen…</span>
+            {/* ── Preview / review screen ── */}
+            {parsedPreview && !loading && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-gray-900">Review Transactions</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {parsedPreview.type} · <span className="capitalize">{parsedPreview.acct}</span> ·{' '}
+                      {Object.keys(parsedPreview.result.byMonth).length} month(s) detected
+                    </p>
+                  </div>
+                  <button onClick={cancelUpload} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
                 </div>
-              )}
-              {!loading && !statementUpload.file && !success && (
-                <p className="text-sm text-gray-400">Select a file to auto-import categories and update account balance.</p>
-              )}
-              {success && (
-                <div className="flex items-center gap-2 text-green-600">
-                  <Check size={20} />
-                  <span className="font-medium">Categories and account balance saved to expense screen!</span>
+
+                {Object.entries(parsedPreview.result.byMonth).map(([monthKey, monthData]) => {
+                  const [y, m] = monthKey.split('_');
+                  const label  = new Date(+y, +m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+                  const txnCount = monthData.categories.reduce((s, c) => s + c.txns, 0);
+                  return (
+                    <div key={monthKey} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Month header */}
+                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <span className="font-semibold text-gray-800">{label}</span>
+                        <span className="text-xs text-gray-500">{monthData.categories.length} categories · {txnCount} transactions</span>
+                      </div>
+
+                      {/* Category rows */}
+                      <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                        {monthData.categories.map((cat, idx) => (
+                          <div key={idx} className="flex items-center justify-between px-4 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                              <span className="text-sm text-gray-700 truncate">{cat.name}</span>
+                              <span className="text-xs text-gray-400 shrink-0">({cat.txns} txn{cat.txns !== 1 ? 's' : ''})</span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-800 ml-3 shrink-0">
+                              ₹{cat.amount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Totals footer */}
+                      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 space-y-1.5">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Total Debits</span>
+                          <span className="font-medium text-gray-800">₹{monthData.totalDebits.toLocaleString('en-IN')}</span>
+                        </div>
+                        {monthData.totalCredits > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Payments / Refunds</span>
+                            <span className="font-medium text-green-600">− ₹{monthData.totalCredits.toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-1.5">
+                          <span className="text-gray-800">Net Spend</span>
+                          <span className="text-sage-700">₹{monthData.netAmount.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={handleConfirmPreview}
+                    className="px-5 py-2.5 bg-sage-600 text-white text-sm font-semibold rounded-lg hover:bg-sage-700 transition-colors flex items-center gap-2"
+                  >
+                    <Check size={16} /> Confirm &amp; Save to Expenses
+                  </button>
+                  <button
+                    onClick={cancelUpload}
+                    className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* ── Upload form (hidden once preview is showing) ── */}
+            {!parsedPreview && !pendingUpload && !uploadSuccess && (
+              <>
+                {/* Row 1: Account · Statement Type */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
+                    <select
+                      value={statementUpload.account}
+                      onChange={e => setStatementUpload(s => ({ ...s, account: e.target.value }))}
+                      className="input-field"
+                    >
+                      <option>Joint</option><option>Anurag</option><option>Nidhi</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Statement Type</label>
+                    <select
+                      value={statementUpload.statementType}
+                      onChange={e => setStatementUpload(s => ({ ...s, statementType: e.target.value, file: null }))}
+                      className="input-field"
+                    >
+                      <option>Bank Statement</option>
+                      <option>HDFC Credit Card</option>
+                      <option>ICICI Credit Card</option>
+                      <option>Paytm</option>
+                      <option>CSV File</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Info banner */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                  <span style={{ fontSize: 18 }}>📊</span>
+                  <p className="text-sm text-blue-800">
+                    <span className="font-semibold">
+                      {statementUpload.statementType === 'Paytm' ? 'Paytm Excel Import — ' : 'CSV Import — '}
+                    </span>
+                    {statementUpload.statementType === 'Paytm'
+                      ? 'Upload your Paytm transaction history (.xlsx). Month is detected automatically and categories are saved directly to the expense screen.'
+                      : 'Upload your statement as a CSV file. Net spend (debits minus payments/refunds) is calculated and saved to the expense screen.'}
+                  </p>
+                </div>
+
+                {/* File drop zone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select File {statementUpload.statementType === 'Paytm' ? '(Excel .xlsx / .xls)' : '(CSV)'}
+                  </label>
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-sage-400 transition-colors">
+                    <div className="space-y-1 text-center">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="flex text-sm text-gray-600">
+                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-sage-600 hover:text-sage-500">
+                          <span>Choose a file</span>
+                          <input
+                            id="file-upload"
+                            type="file"
+                            className="sr-only"
+                            ref={fileInputRef}
+                            accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.csv'}
+                            onChange={e => handleFileSelect(e.target.files[0] || null)}
+                          />
+                        </label>
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {statementUpload.statementType === 'Paytm' ? 'Excel file (.xlsx) up to 10 MB' : 'CSV file up to 10 MB'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected file name */}
+                {statementUpload.file && !loading && (
+                  <p className="text-sm text-gray-500 truncate">{statementUpload.file.name}</p>
+                )}
+              </>
+            )}
+
           </div>
 
           <div className="mt-8 space-y-3">

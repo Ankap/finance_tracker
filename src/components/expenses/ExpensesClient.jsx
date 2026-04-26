@@ -88,7 +88,8 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
     return true;
   });
   const hiddenFixed  = fixedExpenses.filter(fe => fe.addedMonth && monthLabelToKey(fe.addedMonth) > viewedKey);
-  const totalFixed   = visibleFixed.reduce((s, f) => s + f.amount, 0);
+  // Only "fixed" section items count toward total expenses
+  const totalFixed   = visibleFixed.filter(fe => (fe.section ?? 'fixed') === 'fixed').reduce((s, f) => s + f.amount, 0);
   const totalCC         = creditCards.reduce((s, c) => s + c.spend, 0);
   const categoriesTotal = categories.reduce((s, c) => s + c.amount, 0);
   const totalExpenses   = expenses.joint + expenses.anurag + expenses.nidhi + totalFixed + sips + categoriesTotal;

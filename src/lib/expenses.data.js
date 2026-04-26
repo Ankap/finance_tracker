@@ -138,7 +138,14 @@ export async function getExpensesData(month) {
 
     // Fixed expenses are global — all months always use the same list from /api/income.
     // Editing fixed expenses in any month updates the global list for all months.
-    const fixedExpenses = global.fixedExpenses ?? DEFAULT_DATA.fixedExpenses;
+    // Migration: assign section if not already set.
+    const FIXED_LABELS = ['house rent', 'maid', 'cook', 'cash', 'anshul'];
+    const fixedExpenses = (global.fixedExpenses ?? DEFAULT_DATA.fixedExpenses).map(fe => {
+      if (fe.section) return fe;
+      const l = fe.label.toLowerCase();
+      const isFixed = FIXED_LABELS.some(kw => l.includes(kw));
+      return { ...fe, section: isFixed ? 'fixed' : 'committed' };
+    });
 
     return { ...DEFAULT_DATA, ...expJson.data, income, sips, fixedExpenses, month };
   } catch {

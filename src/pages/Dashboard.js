@@ -15,7 +15,7 @@ const calculateSavingsScore = (savingsRate) => {
 };
 
 const calculateGoalScore = (goalsSummary) => {
-  if (!goalsSummary || goalsSummary.total === 0) return 50;
+  if (!goalsSummary || goalsSummary.total === 0) return 0;
   const goodGoals = (goalsSummary.onTrack || 0) + (goalsSummary.completed || 0) + (goalsSummary.ahead || 0);
   return (goodGoals / goalsSummary.total) * 100;
 };
@@ -23,6 +23,7 @@ const calculateGoalScore = (goalsSummary) => {
 const calculateDiversificationScore = (breakdown) => {
   if (!breakdown) return 0;
   const count = Object.keys(breakdown).length;
+  if (count === 0) return 0;
   if (count >= 5) return 100;
   if (count === 4) return 80;
   if (count === 3) return 60;
@@ -31,7 +32,7 @@ const calculateDiversificationScore = (breakdown) => {
 };
 
 const calculateExpenseScore = (income, expenses) => {
-  if (!income || income === 0) return 50;
+  if (!income || income === 0) return 0;
   const ratio = (expenses / income) * 100;
   if (ratio < 30) return 100;
   if (ratio < 50) return 80;
@@ -54,6 +55,11 @@ const calculateHealthScore = (snapshotData, goalsSummary, netWorthData) => {
   const expenses = snapshotData?.snapshot?.expenses?.total || 0;
   const growthPct = snapshotData?.growth?.netWorthChangePercentage || 0;
   const breakdown = netWorthData?.breakdown || {};
+  const totalNetWorth = netWorthData?.totalNetWorth || 0;
+
+  // Return 0 until the user has entered at least some real data
+  const hasData = income > 0 || expenses > 0 || totalNetWorth > 0;
+  if (!hasData) return 0;
 
   const savingsScore = calculateSavingsScore(savingsRate);
   const goalScore = calculateGoalScore(goalsSummary);
@@ -198,7 +204,7 @@ const DashboardScreen = () => {
   // Calculate percentage changes for monthly snapshot
   // TODO: Replace dummy data with actual API data when available
 
-  const savingsRateChange = growth.savingsRateChange || 2.5; // Dummy data
+  const savingsRateChange = growth.savingsRateChange || 0;
 
   // Helper function to render change indicator
   const renderChangeIndicator = (changePercentage, value = null) => {
@@ -365,7 +371,7 @@ const DashboardScreen = () => {
           {/* Financial Health + Monthly Snapshot */}
           <div className="bg-white rounded-2xl p-8 shadow-sm">
             <div className="flex flex-col lg:flex-row items-start gap-8">
-              {/* Financial Health Score — unchanged */}
+              {/* Financial Health Score */}
               <button
                 onClick={() => setShowHealthModal(true)}
                 className="flex items-center gap-6 hover:bg-gray-50 p-4 rounded-xl transition-colors cursor-pointer flex-shrink-0"
@@ -373,17 +379,34 @@ const DashboardScreen = () => {
                 <div className="relative w-32 h-32">
                   <svg className="w-32 h-32 transform -rotate-90">
                     <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="12" fill="none" />
-                    <circle cx="64" cy="64" r="56" stroke={status.ringColor} strokeWidth="12" fill="none" strokeDasharray={`${(healthScore/100)*352} 352`} strokeLinecap="round" />
+                    {healthScore > 0 && (
+                      <circle cx="64" cy="64" r="56" stroke={status.ringColor} strokeWidth="12" fill="none" strokeDasharray={`${(healthScore/100)*352} 352`} strokeLinecap="round" />
+                    )}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold text-gray-900">{healthScore}</span>
-                    <span className="text-sm text-gray-500">/100</span>
-                    <span className="text-xs text-gray-500 mt-1">{status.label}</span>
+                    {healthScore > 0 ? (
+                      <>
+                        <span className="text-3xl font-bold text-gray-900">{healthScore}</span>
+                        <span className="text-sm text-gray-500">/100</span>
+                        <span className="text-xs text-gray-500 mt-1">{status.label}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400 text-center px-2">No data yet</span>
+                    )}
                   </div>
                 </div>
                 <div className="text-left">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Financial Health: <span className={status.textColor}>{healthScore}/100</span></h3>
-                  <div className={`${status.color} text-white px-8 py-3 rounded-lg inline-block font-medium`}>{status.label}</div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Financial Health:{' '}
+                    <span className={healthScore > 0 ? status.textColor : 'text-gray-400'}>
+                      {healthScore > 0 ? `${healthScore}/100` : '—'}
+                    </span>
+                  </h3>
+                  {healthScore > 0 ? (
+                    <div className={`${status.color} text-white px-8 py-3 rounded-lg inline-block font-medium`}>{status.label}</div>
+                  ) : (
+                    <div className="bg-gray-100 text-gray-500 px-8 py-3 rounded-lg inline-block font-medium">Add data to see score</div>
+                  )}
                   <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                     <Info size={14} />
                     Click to see how this is calculated
@@ -505,7 +528,7 @@ const DashboardScreen = () => {
               <div className="space-y-3">
                 {(() => {
                   const insights = [];
-                  if (growth.netWorthChange !== 0) {
+                  if (growth.netWorthChange) {
                     insights.push(
                       <div key="networth" className="flex items-start gap-3">
                         <div className={`w-8 h-8 ${growth.netWorthChange >= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
@@ -520,7 +543,7 @@ const DashboardScreen = () => {
                       </div>
                     );
                   }
-                  if (growth.expenseChange !== 0) {
+                  if (growth.expenseChange) {
                     insights.push(
                       <div key="expense" className="flex items-start gap-3">
                         <div className={`w-8 h-8 ${growth.expenseChange <= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
@@ -534,18 +557,20 @@ const DashboardScreen = () => {
                       </div>
                     );
                   }
-                  insights.push(
-                    <div key="savings" className="flex items-start gap-3">
-                      <div className={`w-8 h-8 ${savingsRate >= 30 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                        {savingsRate >= 30 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
+                  if (income > 0) {
+                    insights.push(
+                      <div key="savings" className="flex items-start gap-3">
+                        <div className={`w-8 h-8 ${savingsRate >= 30 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                          {savingsRate >= 30 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            {savingsRate >= 30 ? `Great job! Saving ${savingsRate.toFixed(0)}% of income this month.` : `Savings rate is ${savingsRate.toFixed(0)}%. Aim for at least 30%.`}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          {savingsRate >= 30 ? `Great job! Saving ${savingsRate.toFixed(0)}% of income this month.` : `Savings rate is ${savingsRate.toFixed(0)}%. Aim for at least 30%.`}
-                        </p>
-                      </div>
-                    </div>
-                  );
+                    );
+                  }
                   if (goalsSummary && goalsSummary.behind > 0) {
                     insights.push(
                       <div key="goals" className="flex items-start gap-3">
@@ -559,18 +584,28 @@ const DashboardScreen = () => {
                     );
                   }
                   const assetTypes = Object.keys(netWorthData?.breakdown || {}).length;
-                  insights.push(
-                    <div key="diversification" className="flex items-start gap-3">
-                      <div className={`w-8 h-8 ${assetTypes >= 5 ? 'bg-teal-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                        <CheckCircle className={assetTypes >= 5 ? 'text-teal-600' : 'text-blue-600'} size={16} />
+                  if (assetTypes > 0) {
+                    insights.push(
+                      <div key="diversification" className="flex items-start gap-3">
+                        <div className={`w-8 h-8 ${assetTypes >= 5 ? 'bg-teal-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                          <CheckCircle className={assetTypes >= 5 ? 'text-teal-600' : 'text-blue-600'} size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            {assetTypes >= 5 ? `Excellent diversification across ${assetTypes} asset types` : `Portfolio spread across ${assetTypes} asset type${assetTypes !== 1 ? 's' : ''}`}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">
-                          {assetTypes >= 5 ? `Excellent diversification across ${assetTypes} asset types` : `Portfolio spread across ${assetTypes} asset type${assetTypes !== 1 ? 's' : ''}`}
-                        </p>
+                    );
+                  }
+                  if (insights.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                        <p className="text-sm text-gray-400">No insights yet.</p>
+                        <p className="text-xs text-gray-400">Add income, expenses, and assets to see your personalised insights.</p>
                       </div>
-                    </div>
-                  );
+                    );
+                  }
                   return insights.slice(0, 5);
                 })()}
               </div>
