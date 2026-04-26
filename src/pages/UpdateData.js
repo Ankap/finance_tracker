@@ -346,7 +346,7 @@ const UpdateData = () => {
 
   // Asset form state
   const [assetForm, setAssetForm] = useState({
-    name: 'Mutual Funds',
+    name: 'MF SIP',
     currentValue: '',
     returnPercentage: '',
     owner: 'Joint',
@@ -383,7 +383,7 @@ const UpdateData = () => {
       }
       localStorage.setItem('ai_insights_stale', 'true');
       setSuccess(true);
-      setAssetForm({ name: 'Mutual Funds', currentValue: '', returnPercentage: '', owner: 'Joint' });
+      setAssetForm({ name: 'MF SIP', currentValue: '', returnPercentage: '', owner: 'Joint' });
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Error updating asset:', error);
@@ -587,8 +587,8 @@ const UpdateData = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Asset Type</label>
                 <select value={assetForm.name} onChange={e => setAssetForm({ ...assetForm, name: e.target.value })} className="input-field" required>
-                  <option>Mutual Funds</option><option>Stocks</option><option>EPF</option>
-                  <option>Gold</option><option>Silver</option><option>Fixed Deposits</option>
+                  <option>MF SIP</option><option>MF Zerodha</option><option>Stocks</option><option>EPF</option>
+                  <option>PPF</option><option>Gold</option><option>Silver</option><option>Fixed Deposits</option>
                   <option>Bank Savings</option><option>House</option><option>Other</option>
                 </select>
               </div>

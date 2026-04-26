@@ -130,9 +130,11 @@ export const getCategoryIcon = (category) => {
 // Get asset icon
 export const getAssetIcon = (assetName) => {
   const icons = {
-    'Mutual Funds': '📈',
+    'MF SIP': '📈',
+    'MF Zerodha': '📈',
     'Stocks': '📊',
     'EPF': '🏛️',
+    'PPF': '🏛️',
     'Gold': '💰',
     'Silver': '🪙',
     'Fixed Deposits': '🏦',
