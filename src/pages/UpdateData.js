@@ -949,7 +949,7 @@ const UpdateData = () => {
                 <div style={{ ...card, flex: 2 }}>
                   <span style={label}>Statement Type</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {['Bank Statement','HDFC Credit Card','ICICI Credit Card','Paytm','CSV File'].map(type => (
+                    {['Bank Statement','HDFC Credit Card','ICICI Credit Card','HSBC Credit Card','Paytm','CSV File'].map(type => (
                       <button
                         type="button"
                         key={type}
