@@ -260,11 +260,12 @@ function parsePaytmExcel(arrayBuffer) {
     return -1;
   }
 
-  const dateCol    = colIdx('Date');
-  const amtCol     = colIdx('Amount');
-  const detailsCol = colIdx('Transaction Details');
-  const tagsCol    = colIdx('Tags');
-  const remarksCol = colIdx('Remarks');
+  const dateCol       = colIdx('Date');
+  const amtCol        = colIdx('Amount');
+  const detailsCol    = colIdx('Transaction Details');
+  const tagsCol       = colIdx('Tags');
+  const remarksCol    = colIdx('Remarks');
+  const yourAcctCol   = colIdx('Your Account', 'Account Name', 'Account');
 
   if (dateCol === -1) return { error: '"Date" column not found.' };
   if (amtCol  === -1) return { error: '"Amount" column not found.' };
@@ -289,6 +290,9 @@ function parsePaytmExcel(arrayBuffer) {
 
     if (hasNeg && amount > 0) continue;
     const absAmount = Math.abs(amount);
+
+    const yourAcct = yourAcctCol !== -1 ? String(row[yourAcctCol] || '').trim() : '';
+    if (yourAcct.toLowerCase().includes('credit card')) continue;
 
     const tag      = tagsCol    !== -1 ? String(row[tagsCol]    || '').trim() : '';
     if (tag === '# Financial Services') continue;
