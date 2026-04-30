@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, TrendingUp, Target, FileText, Check, Sparkles } from 'lucide-react';
+import { Upload, TrendingUp, FileText, Check, Sparkles, X } from 'lucide-react';
 import { assetsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -546,361 +546,359 @@ const UpdateData = () => {
     }
   };
 
+  const card = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px' };
+  const label = { fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 10 };
+  const input = { width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 500, color: '#111827', outline: 'none', boxSizing: 'border-box', background: '#fff' };
+
   return (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-gray-900">Update Data</h2>
-        <p className="text-gray-500 mt-1">Keep your financial data current</p>
+        <div style={{ fontSize: 26, fontWeight: 800, color: '#111827', letterSpacing: '-0.5px' }}>Update Data</div>
+        <div style={{ fontSize: 14, color: '#9ca3af', marginTop: 3 }}>Keep your financial data current</div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e5e7eb' }}>
         {[
-          { id: 'assets',     icon: <TrendingUp size={20} />, label: 'Update Assets'    },
-          { id: 'goals',      icon: <Target     size={20} />, label: 'Review Goals'     },
-          { id: 'statements', icon: <FileText   size={20} />, label: 'Upload Statements' },
+          { id: 'assets',     Icon: TrendingUp, label: 'Update Assets'    },
+          { id: 'statements', Icon: FileText,   label: 'Upload Statements' },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'text-sage-700 border-b-2 border-sage-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'none', border: 'none', borderBottom: activeTab === tab.id ? '2px solid #3d6b4f' : '2px solid transparent',
+              color: activeTab === tab.id ? '#3d6b4f' : '#9ca3af',
+              marginBottom: -1, transition: 'color 0.15s',
+            }}
           >
-            <div className="flex items-center gap-2">{tab.icon}<span>{tab.label}</span></div>
+            <tab.Icon size={15} />{tab.label}
           </button>
         ))}
       </div>
 
       {/* ── Update Assets ── */}
       {activeTab === 'assets' && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-6">
-            <TrendingUp className="text-sage-600" size={24} />
-            <h3 className="text-xl font-semibold text-gray-900">Update Assets</h3>
-          </div>
-          <form onSubmit={handleUpdateAsset} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Asset Type</label>
-                <select value={assetForm.name} onChange={e => setAssetForm({ ...assetForm, name: e.target.value })} className="input-field" required>
-                  <option>MF SIP</option><option>MF Zerodha</option><option>Stocks</option><option>EPF</option>
-                  <option>PPF</option><option>Gold</option><option>Silver</option><option>Fixed Deposits</option>
-                  <option>Bank Savings</option><option>House</option><option>Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Owner</label>
-                <select value={assetForm.owner} onChange={e => setAssetForm({ ...assetForm, owner: e.target.value })} className="input-field" required>
-                  <option>Joint</option><option>Anurag</option><option>Nidhi</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Current Value (₹)</label>
-                <input type="number" value={assetForm.currentValue} onChange={e => setAssetForm({ ...assetForm, currentValue: e.target.value })} className="input-field" placeholder="425000" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Return % (since last update)</label>
-                <input type="number" step="0.01" value={assetForm.returnPercentage} onChange={e => setAssetForm({ ...assetForm, returnPercentage: e.target.value })} className="input-field" placeholder="12.5" required />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <button type="submit" disabled={loading} className="btn-primary flex items-center gap-2">
-                {loading ? <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" /><span>Updating…</span></> : <><Check size={20} /><span>Update Asset</span></>}
-              </button>
-              {success && <div className="flex items-center gap-2 text-green-600"><Check size={20} /><span className="font-medium">Asset updated successfully!</span></div>}
-            </div>
-          </form>
-          <div className="mt-8 p-4 bg-sage-50 rounded-lg border border-sage-100">
-            <div className="flex items-start gap-3">
-              <Sparkles className="text-sage-600 mt-1" size={20} />
-              <div>
-                <p className="font-medium text-gray-900 mb-1">Tip</p>
-                <p className="text-sm text-gray-600">Update your assets monthly to track growth. Return percentage is automatically calculated from the change in value since your last update.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        <form onSubmit={handleUpdateAsset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* ── Review Goals ── */}
-      {activeTab === 'goals' && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-6">
-            <Target className="text-sage-600" size={24} />
-            <h3 className="text-xl font-semibold text-gray-900">Review Goals</h3>
+          {/* Config row */}
+          <div style={{ display: 'flex', gap: 16 }}>
+
+            {/* Asset Type */}
+            <div style={{ ...card, flex: 2 }}>
+              <span style={label}>Asset Type</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {['MF SIP','MF Zerodha','Stocks','EPF','PPF','Gold','Silver','Fixed Deposits','Bank Savings','House','Other'].map(n => (
+                  <button
+                    type="button"
+                    key={n}
+                    onClick={() => setAssetForm({ ...assetForm, name: n })}
+                    style={{
+                      padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: `1px solid ${assetForm.name === n ? '#3d6b4f' : '#e5e7eb'}`,
+                      background: assetForm.name === n ? '#f0faf4' : '#fff',
+                      color: assetForm.name === n ? '#3d6b4f' : '#6b7280',
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Owner */}
+            <div style={{ ...card, flex: 1 }}>
+              <span style={label}>Owner</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['Joint','Anurag','Nidhi'].map(owner => (
+                  <button
+                    type="button"
+                    key={owner}
+                    onClick={() => setAssetForm({ ...assetForm, owner })}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      border: `1px solid ${assetForm.owner === owner ? '#3d6b4f' : '#e5e7eb'}`,
+                      background: assetForm.owner === owner ? '#3d6b4f' : '#fff',
+                      color: assetForm.owner === owner ? '#fff' : '#6b7280',
+                    }}
+                  >
+                    {owner}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="text-center py-12">
-            <Target className="mx-auto mb-4 text-gray-400" size={48} />
-            <p className="text-gray-600 mb-2">Goal progress is updated automatically based on your asset values</p>
-            <p className="text-sm text-gray-500">Go to the Goals page to view detailed progress</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            {[
-              { label: 'Emergency Fund', val: '₹5.19L', goal: 'Goal ₹5.19L', color: 'green', pct: 100 },
-              { label: 'New Home',       val: '₹8.5L',  goal: 'Goal ₹8L',    color: 'blue',  pct: 106 },
-              { label: 'Travel Fund',    val: '₹7L',    goal: 'Goal ₹5L',    color: 'orange',pct: 140 },
-            ].map(g => (
-              <div key={g.label} className={`p-4 bg-${g.color}-50 rounded-lg`}>
-                <p className="text-sm text-gray-600 mb-1">{g.label}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold text-gray-900">{g.val}</span>
-                  <span className={`text-${g.color}-600 text-sm`}>{g.goal}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                  <div className={`bg-${g.color}-600 h-1.5 rounded-full`} style={{ width: `${Math.min(g.pct, 100)}%` }} />
+
+          {/* Values card */}
+          <div style={card}>
+            <div style={{ display: 'flex', gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <span style={label}>Current Value</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14, fontWeight: 600, pointerEvents: 'none' }}>₹</span>
+                  <input
+                    type="number"
+                    value={assetForm.currentValue}
+                    onChange={e => setAssetForm({ ...assetForm, currentValue: e.target.value })}
+                    style={{ ...input, paddingLeft: 28 }}
+                    placeholder="4,25,000"
+                    required
+                  />
                 </div>
               </div>
-            ))}
+              <div style={{ flex: 1 }}>
+                <span style={label}>Return % <span style={{ textTransform: 'none', fontWeight: 400, color: '#d1d5db' }}>(auto-calc if blank)</span></span>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={assetForm.returnPercentage}
+                    onChange={e => setAssetForm({ ...assetForm, returnPercentage: e.target.value })}
+                    style={{ ...input, paddingRight: 32 }}
+                    placeholder="12.5"
+                  />
+                  <span style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 13, pointerEvents: 'none' }}>%</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, border: 'none', background: '#3d6b4f', color: '#fff', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.75 : 1 }}
+              >
+                {loading
+                  ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />Saving…</>
+                  : <>✓ Save Asset</>
+                }
+              </button>
+              {success && (
+                <span style={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>✓ Saved successfully</span>
+              )}
+            </div>
           </div>
-        </div>
+
+        </form>
       )}
 
       {/* ── Upload Statements ── */}
       {activeTab === 'statements' && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-6">
-            <FileText className="text-sage-600" size={24} />
-            <h3 className="text-xl font-semibold text-gray-900">Upload Statements</h3>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          <div className="space-y-6">
+          {/* Loading */}
+          {loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#3d6b4f', fontSize: 13, fontWeight: 600 }}>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-200 border-t-green-600" />
+              {parsedPreview ? 'Saving to expenses…' : 'Processing file…'}
+            </div>
+          )}
 
-            {/* ── Loading spinner ── */}
-            {loading && (
-              <div className="flex items-center gap-2 text-sage-600">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-sage-600" />
-                <span className="font-medium">
-                  {parsedPreview ? 'Saving to expense screen…' : 'Processing file…'}
-                </span>
+          {/* Success */}
+          {uploadSuccess && (
+            <div style={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>✓ Upload successful! Redirecting to expenses…</div>
+          )}
+
+          {/* Conflict */}
+          {pendingUpload && !loading && (
+            <div style={{ ...card, background: '#fffbeb', border: '1px solid #fcd34d', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#92400e', margin: 0 }}>
+                Data already exists for <strong>{pendingUpload.type}</strong> / <strong style={{ textTransform: 'capitalize' }}>{pendingUpload.acct}</strong> in:
+              </p>
+              <ul style={{ paddingLeft: 18, margin: 0 }}>
+                {pendingUpload.conflictMonths.map(m => <li key={m} style={{ fontSize: 12, color: '#b45309' }}>{m}</li>)}
+              </ul>
+              <p style={{ fontSize: 12, color: '#b45309', margin: 0 }}>Overwrite the existing data for these months?</p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => doSave(pendingUpload.type, pendingUpload.acct, pendingUpload.result)}
+                  style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: '#d97706', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Yes, Override
+                </button>
+                <button
+                  onClick={cancelUpload}
+                  style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* ── Success banner ── */}
-            {uploadSuccess && (
-              <div className="flex items-center gap-2 text-green-600">
-                <Check size={20} />
-                <span className="font-medium">Upload successful! Redirecting to expenses…</span>
-              </div>
-            )}
-
-            {/* ── Conflict / override confirmation ── */}
-            {pendingUpload && !loading && (
-              <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg space-y-3">
-                <p className="text-sm font-semibold text-amber-800">
-                  Data already exists for <span className="font-bold">{pendingUpload.type}</span> / <span className="font-bold capitalize">{pendingUpload.acct}</span> in:
-                </p>
-                <ul className="list-disc list-inside text-sm text-amber-700 space-y-0.5">
-                  {pendingUpload.conflictMonths.map(m => <li key={m}>{m}</li>)}
-                </ul>
-                <p className="text-sm text-amber-700">Do you want to override the existing data for these months?</p>
-                <div className="flex gap-3 pt-1">
-                  <button
-                    onClick={() => doSave(pendingUpload.type, pendingUpload.acct, pendingUpload.result)}
-                    className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
-                  >
-                    Yes, Override
-                  </button>
-                  <button
-                    onClick={cancelUpload}
-                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
+          {/* Preview */}
+          {parsedPreview && !loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: '0 0 3px' }}>Review Transactions</p>
+                  <p style={{ fontSize: 13, color: '#9ca3af', margin: 0 }}>
+                    {parsedPreview.type} · <span style={{ textTransform: 'capitalize' }}>{parsedPreview.acct}</span> · {Object.keys(parsedPreview.result.byMonth).length} month(s) detected
+                  </p>
                 </div>
+                <button onClick={cancelUpload} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 18, lineHeight: 1 }}>✕</button>
               </div>
-            )}
 
-            {/* ── Preview / review screen ── */}
-            {parsedPreview && !loading && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-base font-semibold text-gray-900">Review Transactions</p>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {parsedPreview.type} · <span className="capitalize">{parsedPreview.acct}</span> ·{' '}
-                      {Object.keys(parsedPreview.result.byMonth).length} month(s) detected
-                    </p>
-                  </div>
-                  <button onClick={cancelUpload} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9ca3af' }}>✕</button>
-                </div>
-
-                {Object.entries(parsedPreview.result.byMonth).map(([monthKey, monthData]) => {
-                  const [y, m] = monthKey.split('_');
-                  const label  = new Date(+y, +m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-                  const txnCount = monthData.categories.reduce((s, c) => s + c.txns, 0);
-                  return (
-                    <div key={monthKey} className="border border-gray-200 rounded-lg overflow-hidden">
-                      {/* Month header */}
-                      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                        <span className="font-semibold text-gray-800">{label}</span>
-                        <span className="text-xs text-gray-500">{monthData.categories.length} categories · {txnCount} transactions</span>
-                      </div>
-
-                      {/* Category rows */}
-                      <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
-                        {monthData.categories.map((cat, idx) => (
-                          <div key={idx} className="flex items-center justify-between px-4 py-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                              <span className="text-sm text-gray-700 truncate">{cat.name}</span>
-                              <span className="text-xs text-gray-400 shrink-0">({cat.txns} txn{cat.txns !== 1 ? 's' : ''})</span>
-                            </div>
-                            <span className="text-sm font-medium text-gray-800 ml-3 shrink-0">
-                              ₹{cat.amount.toLocaleString('en-IN')}
-                            </span>
+              {Object.entries(parsedPreview.result.byMonth).map(([monthKey, monthData]) => {
+                const [y, m] = monthKey.split('_');
+                const lbl      = new Date(+y, +m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+                const txnCount = monthData.categories.reduce((s, c) => s + c.txns, 0);
+                return (
+                  <div key={monthKey} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', background: '#f9fafb', borderBottom: '1px solid #f3f4f6' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{lbl}</span>
+                      <span style={{ fontSize: 12, color: '#9ca3af' }}>{monthData.categories.length} categories · {txnCount} txns</span>
+                    </div>
+                    <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                      {monthData.categories.map((cat, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 18px', borderBottom: '1px solid #f9fafb' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <span style={{ fontSize: 16, flexShrink: 0 }}>{cat.icon}</span>
+                            <span style={{ fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
+                            <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>({cat.txns} txn{cat.txns !== 1 ? 's' : ''})</span>
                           </div>
-                        ))}
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginLeft: 12, flexShrink: 0 }}>₹{cat.amount.toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: '12px 18px', background: '#f9fafb', borderTop: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}>
+                        <span>Total Debits</span><span style={{ fontWeight: 600 }}>₹{monthData.totalDebits.toLocaleString('en-IN')}</span>
                       </div>
-
-                      {/* Totals footer */}
-                      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 space-y-1.5">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-500">Total Debits</span>
-                          <span className="font-medium text-gray-800">₹{monthData.totalDebits.toLocaleString('en-IN')}</span>
+                      {monthData.totalCredits > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#16a34a' }}>
+                          <span>Payments / Refunds</span><span style={{ fontWeight: 600 }}>− ₹{monthData.totalCredits.toLocaleString('en-IN')}</span>
                         </div>
-                        {monthData.totalCredits > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Payments / Refunds</span>
-                            <span className="font-medium text-green-600">− ₹{monthData.totalCredits.toLocaleString('en-IN')}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-1.5">
-                          <span className="text-gray-800">Net Spend</span>
-                          <span className="text-sage-700">₹{monthData.netAmount.toLocaleString('en-IN')}</span>
-                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, borderTop: '1px solid #e5e7eb', paddingTop: 8, marginTop: 2 }}>
+                        <span style={{ color: '#111827' }}>Net Spend</span>
+                        <span style={{ color: '#3d6b4f' }}>₹{monthData.netAmount.toLocaleString('en-IN')}</span>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
 
-                <div className="flex gap-3 pt-1">
-                  <button
-                    onClick={handleConfirmPreview}
-                    className="px-5 py-2.5 bg-sage-600 text-white text-sm font-semibold rounded-lg hover:bg-sage-700 transition-colors flex items-center gap-2"
-                  >
-                    <Check size={16} /> Confirm &amp; Save to Expenses
-                  </button>
-                  <button
-                    onClick={cancelUpload}
-                    className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={handleConfirmPreview}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#3d6b4f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                >
+                  ✓ Confirm &amp; Save to Expenses
+                </button>
+                <button
+                  onClick={cancelUpload}
+                  style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Upload form */}
+          {!parsedPreview && !pendingUpload && !uploadSuccess && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Config row */}
+              <div style={{ display: 'flex', gap: 16 }}>
+
+                {/* Account */}
+                <div style={{ ...card, flex: 1 }}>
+                  <span style={label}>Account</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {['Joint','Anurag','Nidhi'].map(acct => (
+                      <button
+                        type="button"
+                        key={acct}
+                        onClick={() => setStatementUpload(s => ({ ...s, account: acct }))}
+                        style={{
+                          flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          border: `1px solid ${statementUpload.account === acct ? '#3d6b4f' : '#e5e7eb'}`,
+                          background: statementUpload.account === acct ? '#3d6b4f' : '#fff',
+                          color: statementUpload.account === acct ? '#fff' : '#6b7280',
+                        }}
+                      >
+                        {acct}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Statement Type */}
+                <div style={{ ...card, flex: 2 }}>
+                  <span style={label}>Statement Type</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {['Bank Statement','HDFC Credit Card','ICICI Credit Card','Paytm','CSV File'].map(type => (
+                      <button
+                        type="button"
+                        key={type}
+                        onClick={() => setStatementUpload(s => ({ ...s, statementType: type, file: null }))}
+                        style={{
+                          padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          border: `1px solid ${statementUpload.statementType === type ? '#3d6b4f' : '#e5e7eb'}`,
+                          background: statementUpload.statementType === type ? '#f0faf4' : '#fff',
+                          color: statementUpload.statementType === type ? '#3d6b4f' : '#6b7280',
+                        }}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* ── Upload form (hidden once preview is showing) ── */}
-            {!parsedPreview && !pendingUpload && !uploadSuccess && (
-              <>
-                {/* Row 1: Account · Statement Type */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account</label>
-                    <select
-                      value={statementUpload.account}
-                      onChange={e => setStatementUpload(s => ({ ...s, account: e.target.value }))}
-                      className="input-field"
-                    >
-                      <option>Joint</option><option>Anurag</option><option>Nidhi</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Statement Type</label>
-                    <select
-                      value={statementUpload.statementType}
-                      onChange={e => setStatementUpload(s => ({ ...s, statementType: e.target.value, file: null }))}
-                      className="input-field"
-                    >
-                      <option>Bank Statement</option>
-                      <option>HDFC Credit Card</option>
-                      <option>ICICI Credit Card</option>
-                      <option>Paytm</option>
-                      <option>CSV File</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Info banner */}
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-                  <span style={{ fontSize: 18 }}>📊</span>
-                  <p className="text-sm text-blue-800">
-                    <span className="font-semibold">
-                      {statementUpload.statementType === 'Paytm' ? 'Paytm Excel Import — ' : 'CSV Import — '}
-                    </span>
+              {/* Drop zone card */}
+              <div style={card}>
+                <div style={{ display: 'flex', gap: 10, padding: '10px 14px', background: '#eff6ff', borderRadius: 10, border: '1px solid #dbeafe', marginBottom: 16 }}>
+                  <span style={{ flexShrink: 0 }}>📊</span>
+                  <p style={{ fontSize: 12, color: '#1e40af', margin: 0, lineHeight: 1.6 }}>
+                    <strong>{statementUpload.statementType === 'Paytm' ? 'Paytm Excel — ' : 'CSV Import — '}</strong>
                     {statementUpload.statementType === 'Paytm'
-                      ? 'Upload your Paytm transaction history (.xlsx). Month is detected automatically and categories are saved directly to the expense screen.'
-                      : 'Upload your statement as a CSV file. Net spend (debits minus payments/refunds) is calculated and saved to the expense screen.'}
+                      ? 'Upload your transaction history (.xlsx). Month is auto-detected and categories saved to expenses.'
+                      : 'Upload your statement as a CSV. Net spend (debits minus refunds) is calculated and saved to expenses.'}
                   </p>
                 </div>
 
-                {/* File drop zone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select File {statementUpload.statementType === 'Paytm' ? '(Excel .xlsx / .xls)' : '(CSV)'}
-                  </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-sage-400 transition-colors">
-                    <div className="space-y-1 text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600">
-                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-sage-600 hover:text-sage-500">
-                          <span>Choose a file</span>
-                          <input
-                            id="file-upload"
-                            type="file"
-                            className="sr-only"
-                            ref={fileInputRef}
-                            accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.csv'}
-                            onChange={e => handleFileSelect(e.target.files[0] || null)}
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {statementUpload.statementType === 'Paytm' ? 'Excel file (.xlsx) up to 10 MB' : 'CSV file up to 10 MB'}
-                      </p>
-                    </div>
+                <label
+                  htmlFor="file-upload"
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '28px 24px', border: '2px dashed #e5e7eb', borderRadius: 12, cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#6daa84'; e.currentTarget.style.background = '#f0faf4'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Upload size={20} color="#9ca3af" />
                   </div>
-                </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#3d6b4f' }}>Choose a file</span>
+                    <span style={{ fontSize: 14, color: '#6b7280' }}> or drag and drop</span>
+                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+                      {statementUpload.statementType === 'Paytm' ? 'Excel (.xlsx) up to 10 MB' : 'CSV up to 10 MB'}
+                    </p>
+                  </div>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    style={{ display: 'none' }}
+                    ref={fileInputRef}
+                    accept={statementUpload.statementType === 'Paytm' ? '.xlsx,.xls' : '.csv'}
+                    onChange={e => handleFileSelect(e.target.files[0] || null)}
+                  />
+                </label>
 
-                {/* Selected file name */}
                 {statementUpload.file && !loading && (
-                  <p className="text-sm text-gray-500 truncate">{statementUpload.file.name}</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', marginTop: 10 }}>📎 {statementUpload.file.name}</p>
                 )}
-              </>
-            )}
-
-          </div>
-
-          <div className="mt-8 space-y-3">
-            <div className="p-3 bg-green-50 rounded-lg flex items-center gap-2">
-              <Check className="text-green-600" size={20} />
-              <p className="text-sm text-gray-700"><span className="font-medium">Added ₹1,10,000 this Fixed Deposits</span></p>
+              </div>
             </div>
-            <div className="p-3 bg-green-50 rounded-lg flex items-center gap-2">
-              <Check className="text-green-600" size={20} />
-              <p className="text-sm text-gray-700"><span className="font-medium">Emergency Fund reached to 25% milestone</span></p>
-            </div>
-          </div>
+          )}
+
         </div>
       )}
 
-      {/* ── AI Review ── */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="text-sage-600" size={24} />
-          <h3 className="text-xl font-semibold text-gray-900">AI Review</h3>
-        </div>
-        <div className="space-y-3">
-          <div className="p-4 bg-sage-50 rounded-lg"><p className="text-gray-700">You added the most to your fixed deposits this month.</p></div>
-          <div className="p-4 bg-sage-50 rounded-lg"><p className="text-gray-700">The emergency fund hit an important milestone too.</p></div>
-        </div>
-        <button className="mt-6 w-full btn-primary">Done</button>
-      </div>
     </div>
   );
 };

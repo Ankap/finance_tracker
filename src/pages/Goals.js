@@ -209,38 +209,37 @@ const Goals = () => {
     ? goals.reduce((sum, g) => sum + Math.min((g.currentAmount / g.targetAmount) * 100, 100), 0) / goals.length
     : 0;
 
+  const completedCount = goals.filter(g => g.status === 'Completed').length;
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Goals</h2>
           <p className="text-gray-500 mt-1">Track your financial milestones</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={20} />
-          <span>Add Goal</span>
-        </button>
-      </div>
-
-      {/* Overall Progress */}
-      {goals.length > 0 && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-700">Overall Progress</h3>
-            <span className="text-2xl font-bold text-sage-700">{totalProgress.toFixed(0)}%</span>
-          </div>
-          <div className="bg-gray-200 rounded-full h-3">
-            <div
-              className="bg-sage-600 h-3 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(totalProgress, 100)}%` }}
-            />
-          </div>
-          <p className="text-sm text-gray-500 mt-3">
-            {goals.filter(g => g.status === 'Completed').length} of {goals.length} goals completed
-          </p>
+        <div className="flex items-center gap-3">
+          {goals.length > 0 && (
+            <div className="flex items-center gap-3 bg-sage-50 border border-sage-100 rounded-xl px-4 py-2">
+              <span className="text-xl font-bold text-sage-700">{totalProgress.toFixed(0)}%</span>
+              <div className="flex flex-col gap-1">
+                <div className="w-28 bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className="bg-sage-600 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(totalProgress, 100)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500">{completedCount} of {goals.length} completed</span>
+              </div>
+            </div>
+          )}
+          <button onClick={() => setShowModal(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={20} />
+            <span>Add Goal</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Goals Grid — 2 columns */}
       {goals.length > 0 ? (

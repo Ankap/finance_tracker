@@ -1,24 +1,119 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Sparkles, Maximize2, X, Trash2 } from 'lucide-react';
+import { TrendingUp, Sparkles, Maximize2, X, Trash2, Pencil } from 'lucide-react';
 import { assetsAPI } from '../services/api';
 import { formatCurrency, formatPercentage, getAssetIcon, formatDate } from '../utils/formatters';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+function getMonthRange() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }));
+  }
+  return months;
+}
+
+const MONTHS = getMonthRange();
+const ASSET_TYPES = ['MF SIP', 'MF Zerodha', 'Stocks', 'EPF', 'PPF', 'Gold', 'Silver', 'Fixed Deposits', 'Bank Savings', 'House', 'Other'];
+
+function EditAssetModal({ asset, onSave, onClose }) {
+  const [name, setName]               = useState(asset.name);
+  const [owner, setOwner]             = useState(asset.owner || 'Joint');
+  const [accountDetails, setDetails]  = useState(asset.accountDetails || '');
+  const [saving, setSaving]           = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ name, owner, accountDetails });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Edit Asset</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Asset type pills */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2">Asset Type</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ASSET_TYPES.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setName(t)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    name === t
+                      ? 'border-sage-600 bg-sage-50 text-sage-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Owner */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2">Owner</label>
+            <div className="flex gap-2">
+              {['Joint', 'Anurag', 'Nidhi'].map(o => (
+                <button
+                  key={o}
+                  onClick={() => setOwner(o)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                    owner === o
+                      ? 'border-sage-600 bg-sage-600 text-white'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Account details */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Account Details <span className="text-gray-400">(optional)</span></label>
+            <input
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:border-sage-400"
+              placeholder="e.g. HDFC MF, Zerodha"
+              value={accountDetails}
+              onChange={e => setDetails(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 p-5 pt-0">
+          <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-sage-600 text-white hover:bg-sage-700 transition-colors disabled:opacity-60">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const WealthOverview = () => {
   const [assets, setAssets] = useState([]);
   const [netWorthData, setNetWorthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedOwner, setSelectedOwner] = useState('All');
+  const [selectedMonth, setSelectedMonth] = useState(MONTHS[0]);
   const [isChartExpanded, setIsChartExpanded] = useState(false);
-  const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null); // { _id, name }
+  const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null);
+  const [editingAsset, setEditingAsset]             = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
       const [assetsRes, netWorthRes] = await Promise.all([
-        assetsAPI.getAll(ownerFilter),
-        assetsAPI.getNetWorth(ownerFilter),
+        assetsAPI.getAll(ownerFilter, selectedMonth),
+        assetsAPI.getNetWorth(ownerFilter, selectedMonth),
       ]);
       setAssets(assetsRes.data);
       setNetWorthData(netWorthRes.data);
@@ -27,7 +122,7 @@ const WealthOverview = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedOwner]);
+  }, [selectedOwner, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -76,6 +171,13 @@ const WealthOverview = () => {
     return snaps[snaps.length - 1].value - snaps[snaps.length - 2].value;
   })();
 
+  const handleEdit = async (patch) => {
+    const { _id } = editingAsset;
+    setEditingAsset(null);
+    await assetsAPI.update(_id, patch);
+    fetchData();
+  };
+
   const handleDelete = async () => {
     if (!confirmDeleteAsset) return;
     const { _id } = confirmDeleteAsset;
@@ -89,13 +191,29 @@ const WealthOverview = () => {
     /* Layout's main already has py-8 (64px) + sticky header (~73px) ≈ 137px consumed */
     <div className="flex flex-col gap-3">
 
-      {/* Owner filter row */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      {/* Header row */}
+      <div className="flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Wealth Overview</h2>
           <p className="text-gray-500 text-sm">Track your assets and investments</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Month selector */}
+          <div className="relative inline-flex items-center">
+            <span className="absolute left-2.5 pointer-events-none text-sm">📅</span>
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-sm text-gray-700 font-medium cursor-pointer appearance-none outline-none"
+            >
+              {MONTHS.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          {/* Divider */}
+          <div className="h-5 w-px bg-gray-200" />
+          {/* Owner filter */}
           {['All', 'Joint', 'Anurag', 'Nidhi'].map((owner) => (
             <button
               key={owner}
@@ -213,13 +331,22 @@ const WealthOverview = () => {
                         </p>
                       )}
                     </div>
-                    <button
-                      onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
-                      title="Delete asset"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 transition-all flex-shrink-0">
+                      <button
+                        onClick={() => setEditingAsset(asset)}
+                        className="p-1 rounded-lg text-gray-400 hover:text-sage-600 hover:bg-sage-50 transition-colors"
+                        title="Edit asset"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })}
+                        className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Delete asset"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -227,6 +354,15 @@ const WealthOverview = () => {
 
           </div>
       </div>
+
+      {/* Edit asset modal */}
+      {editingAsset && (
+        <EditAssetModal
+          asset={editingAsset}
+          onSave={handleEdit}
+          onClose={() => setEditingAsset(null)}
+        />
+      )}
 
       {/* Delete confirmation popup */}
       {confirmDeleteAsset && (

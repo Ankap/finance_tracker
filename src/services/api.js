@@ -199,9 +199,10 @@ const wealthInsights = {
 
 // Helpers for asset API calls that read/write JSON files via Next.js API routes
 
-async function fetchAssetsFromFile(owner = null) {
+async function fetchAssetsFromFile(owner = null, month = null) {
   try {
-    const res = await fetch('/api/assets');
+    const url = month ? `/api/assets?month=${encodeURIComponent(month)}` : '/api/assets';
+    const res = await fetch(url);
     if (!res.ok) throw new Error('API unavailable');
     const json = await res.json();
     const assets = json.data;
@@ -226,19 +227,20 @@ async function postToAssetsAPI(body) {
 }
 
 export const assetsAPI = {
-  getAll: async (owner = null) => {
-    const assets = await fetchAssetsFromFile(owner);
+  getAll: async (owner = null, month = null) => {
+    const assets = await fetchAssetsFromFile(owner, month);
     return { data: assets };
   },
   getById: (id) => Promise.resolve({ data: staticAssets.find(a => a._id === id) }),
   create: (assetData) => postToAssetsAPI({ action: 'create', ...assetData }),
-  update: () => Promise.resolve({ data: { success: true } }),
+  update: (assetId, patch) => postToAssetsAPI({ action: 'update', assetId, ...patch }),
   delete: (id) => postToAssetsAPI({ action: 'delete', assetId: id }),
   addSnapshot: (assetId, snapshot) =>
     postToAssetsAPI({ action: 'addSnapshot', assetId, ...snapshot }),
-  getNetWorth: async (owner = null) => {
+  resetMonth: (month) => postToAssetsAPI({ action: 'reset', month }),
+  getNetWorth: async (owner = null, month = null) => {
     try {
-      const assets = await fetchAssetsFromFile(owner);
+      const assets = await fetchAssetsFromFile(owner, month);
       const totalNetWorth = assets.reduce((sum, a) => sum + a.currentValue, 0);
       const breakdown = {};
       assets.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + a.currentValue; });
