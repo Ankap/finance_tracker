@@ -42,15 +42,29 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
   return (
     <>
       <div className="expenses-stats-row" style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        {/* Total Expenses */}
-        <div style={{ flex: 1, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 22px" }}>
+        {/* Total Income */}
+        <div style={{ flex: 1, minWidth: 220, background: "linear-gradient(135deg, #f0faf4 0%, #fff 70%)", border: "1px solid #b7e4c7", borderRadius: 12, padding: "18px 22px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginBottom: 6 }}>Total Expenses</div>
+            <div style={{ fontSize: 13, color: "#2d6a4f", fontWeight: 600, marginBottom: 6 }}>Total Income</div>
+            <button onClick={onEditIncome} style={{ fontSize: 11, fontWeight: 600, color: "#3d6b4f", background: "#fff", border: "1px solid #b7e4c7", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap" }}>✎ Edit</button>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: "#2d6a4f", letterSpacing: "-0.5px", marginBottom: 4 }}>{fmt(totalIncome)}</div>
+          <div style={{ fontSize: 12, color: "#52966e" }}>
+            {fmt(anuragTotal)} Anurag{income.anurag.bonus > 0 && <span style={{ color: "#16a34a" }}> +bonus</span>}
+            &nbsp;·&nbsp;
+            {fmt(nidhiTotal)} Nidhi{income.nidhi.bonus > 0 && <span style={{ color: "#16a34a" }}> +bonus</span>}
+          </div>
+        </div>
+
+        {/* Total Expenses */}
+        <div style={{ flex: 1, minWidth: 220, background: "linear-gradient(135deg, #fff7ed 0%, #fff 70%)", border: "1px solid #fed7aa", borderRadius: 12, padding: "18px 22px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600, marginBottom: 6 }}>Total Expenses</div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setEditingExpenses(true)} style={{ fontSize: 11, fontWeight: 600, color: "#3d6b4f", background: "#f0faf4", border: "1px solid #bbf0d0", borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>✎ Edit</button>
+              <button onClick={() => setEditingExpenses(true)} style={{ fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fff", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>✎ Edit</button>
             </div>
           </div>
-          <div onClick={onExpensesClick} style={{ fontSize: 26, fontWeight: 700, color: "#111827", letterSpacing: "-0.5px", marginBottom: 4, cursor: onExpensesClick ? "pointer" : "default" }}>{fmt(totalExpenses)}</div>
+          <div onClick={onExpensesClick} style={{ fontSize: 26, fontWeight: 700, color: "#92400e", letterSpacing: "-0.5px", marginBottom: 4, cursor: onExpensesClick ? "pointer" : "default" }}>{fmt(totalExpenses)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ color: down ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 600 }}>{down ? `↓ ${fmt(Math.abs(delta))} vs last month` : `↑ ${fmt(delta)} vs last month`}</span>
             <button onClick={() => setEditingLastMonth(true)} title="Edit last month" style={{ fontSize: 10, color: "#9ca3af", background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 5px", cursor: "pointer" }}>✎</button>
@@ -58,9 +72,9 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
         </div>
 
         {/* Total Savings */}
-        <div style={{ flex: 1, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 22px" }}>
-          <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginBottom: 6 }}>Total Savings</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: investable >= 0 ? "#111827" : "#dc2626", letterSpacing: "-0.5px", marginBottom: 4 }}>{fmt(Math.abs(investable))}{investable < 0 ? ' deficit' : ''}</div>
+        <div style={{ flex: 1, minWidth: 220, background: "linear-gradient(135deg, #eff6ff 0%, #fff 70%)", border: "1px solid #bfdbfe", borderRadius: 12, padding: "18px 22px" }}>
+          <div style={{ fontSize: 13, color: "#1e40af", fontWeight: 600, marginBottom: 6 }}>Total Savings</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: investable >= 0 ? "#1e40af" : "#dc2626", letterSpacing: "-0.5px", marginBottom: 4 }}>{fmt(Math.abs(investable))}{investable < 0 ? ' deficit' : ''}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ color: savingsRate >= 40 ? "#16a34a" : "#d97706", fontSize: 12, fontWeight: 600 }}>{savingsRate}% savings rate</span>
             <span style={{ fontSize: 11, color: "#d1d5db" }}>·</span>
@@ -68,19 +82,6 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
           </div>
         </div>
 
-        {/* Total Income */}
-        <div style={{ flex: 1, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 22px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginBottom: 6 }}>Total Income</div>
-            <button onClick={onEditIncome} style={{ fontSize: 11, fontWeight: 600, color: "#3d6b4f", background: "#f0faf4", border: "1px solid #bbf0d0", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap" }}>✎ Edit</button>
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: "#111827", letterSpacing: "-0.5px", marginBottom: 4 }}>{fmt(totalIncome)}</div>
-          <div style={{ fontSize: 12, color: "#9ca3af" }}>
-            {fmt(anuragTotal)} Anurag{income.anurag.bonus > 0 && <span style={{ color: "#16a34a" }}> +bonus</span>}
-            &nbsp;·&nbsp;
-            {fmt(nidhiTotal)} Nidhi{income.nidhi.bonus > 0 && <span style={{ color: "#16a34a" }}> +bonus</span>}
-          </div>
-        </div>
       </div>
 
       {editingExpenses && (

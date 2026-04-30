@@ -202,7 +202,7 @@ const ChatWidget = () => {
         <button
           onClick={() => setOpen((v) => !v)}
           className="relative flex items-center justify-center bg-transparent border-none outline-none cursor-pointer p-0"
-          style={{ animation: open ? 'none' : 'robotBounce 1.4s ease-in-out infinite' }}
+          style={{}}
           title="AI Finance Assistant"
         >
           {open
@@ -210,14 +210,6 @@ const ChatWidget = () => {
             : <RobotFace size={70 } />
           }
         </button>
-        <style>{`
-          @keyframes robotBounce {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            30%       { transform: translateY(-12px) rotate(-4deg); }
-            50%       { transform: translateY(-8px) rotate(4deg); }
-            70%       { transform: translateY(-4px) rotate(-2deg); }
-          }
-        `}</style>
       </div>
 
       {/* Chat modal */}
