@@ -333,6 +333,17 @@ function parsePaytmExcel(arrayBuffer) {
   return { byMonth, sheet: sheetName };
 }
 
+// ── Recalculate month totals after category edits/deletes ────────────────────
+function recalcMonthTotals(categories, totalCredits) {
+  const totalDebits = categories.reduce((sum, c) => sum + Math.max(0, c.amount), 0);
+  const netAmount   = Math.max(0, totalDebits - totalCredits);
+  const cats        = categories.map(c => ({
+    ...c,
+    pct: totalDebits > 0 ? parseFloat(((c.amount / totalDebits) * 100).toFixed(1)) : 0,
+  }));
+  return { categories: cats, totalDebits, netAmount, total: totalDebits };
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 const UpdateData = () => {
   const navigate                  = useNavigate();
@@ -342,6 +353,7 @@ const UpdateData = () => {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [pendingUpload, setPendingUpload] = useState(null);  // { type, acct, result, conflictMonths }
   const [parsedPreview, setParsedPreview] = useState(null);  // { type, acct, result }
+  const [editingItem, setEditingItem]     = useState(null);  // { monthKey, idx, name, amount, icon }
   const fileInputRef              = useRef(null);
 
   // Asset form state
@@ -441,6 +453,41 @@ const UpdateData = () => {
     setParsedPreview(null);
     setStatementUpload(s => ({ ...s, file: null }));
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ── Edit / delete individual line items in the preview ────────────────────
+  const handleDeletePreviewItem = (monthKey, idx) => {
+    setParsedPreview(prev => {
+      const monthData = prev.result.byMonth[monthKey];
+      const newCats   = monthData.categories.filter((_, i) => i !== idx);
+      const updated   = recalcMonthTotals(newCats, monthData.totalCredits);
+      return {
+        ...prev,
+        result: {
+          ...prev.result,
+          byMonth: { ...prev.result.byMonth, [monthKey]: { ...monthData, ...updated } },
+        },
+      };
+    });
+  };
+
+  const handleSavePreviewEdit = () => {
+    const { monthKey, idx, name, amount, icon } = editingItem;
+    setParsedPreview(prev => {
+      const monthData = prev.result.byMonth[monthKey];
+      const newCats   = monthData.categories.map((c, i) =>
+        i === idx ? { ...c, name: name.trim() || c.name, amount: Math.round(parseFloat(amount) || c.amount), icon: icon.trim() || c.icon } : c
+      );
+      const updated = recalcMonthTotals(newCats, monthData.totalCredits);
+      return {
+        ...prev,
+        result: {
+          ...prev.result,
+          byMonth: { ...prev.result.byMonth, [monthKey]: { ...monthData, ...updated } },
+        },
+      };
+    });
+    setEditingItem(null);
   };
 
   // ── File selected — parse immediately and show review screen ─────────────
@@ -752,15 +799,27 @@ const UpdateData = () => {
                       <span style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{lbl}</span>
                       <span style={{ fontSize: 12, color: '#9ca3af' }}>{monthData.categories.length} categories · {txnCount} txns</span>
                     </div>
-                    <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                    <div style={{ maxHeight: 280, overflowY: 'auto' }}>
                       {monthData.categories.map((cat, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 18px', borderBottom: '1px solid #f9fafb' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid #f9fafb' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                             <span style={{ fontSize: 16, flexShrink: 0 }}>{cat.icon}</span>
                             <span style={{ fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.name}</span>
                             <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>({cat.txns} txn{cat.txns !== 1 ? 's' : ''})</span>
                           </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginLeft: 12, flexShrink: 0 }}>₹{cat.amount.toLocaleString('en-IN')}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>₹{cat.amount.toLocaleString('en-IN')}</span>
+                            <button
+                              onClick={() => setEditingItem({ monthKey, idx, name: cat.name, amount: cat.amount, icon: cat.icon })}
+                              title="Edit"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px 4px', fontSize: 13, lineHeight: 1 }}
+                            >✏️</button>
+                            <button
+                              onClick={() => handleDeletePreviewItem(monthKey, idx)}
+                              title="Delete"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px 4px', fontSize: 13, lineHeight: 1 }}
+                            >✕</button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -781,6 +840,60 @@ const UpdateData = () => {
                   </div>
                 );
               })}
+
+              {/* Edit item modal */}
+              {editingItem && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ background: '#fff', borderRadius: 14, padding: '24px 28px', width: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Edit Transaction</span>
+                      <button onClick={() => setEditingItem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 18 }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
+                        Icon
+                        <input
+                          value={editingItem.icon}
+                          onChange={e => setEditingItem(p => ({ ...p, icon: e.target.value }))}
+                          style={{ display: 'block', marginTop: 4, width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 18, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
+                        Category Name
+                        <input
+                          value={editingItem.name}
+                          onChange={e => setEditingItem(p => ({ ...p, name: e.target.value }))}
+                          style={{ display: 'block', marginTop: 4, width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>
+                        Amount (₹)
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingItem.amount}
+                          onChange={e => setEditingItem(p => ({ ...p, amount: e.target.value }))}
+                          style={{ display: 'block', marginTop: 4, width: '100%', padding: '7px 10px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+                        />
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                      <button
+                        onClick={handleSavePreviewEdit}
+                        style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', background: '#3d6b4f', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingItem(null)}
+                        style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
