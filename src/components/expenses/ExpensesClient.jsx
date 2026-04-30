@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { TopStats }           from './TopStats';
 import { MoneyFlowBanner }    from './MoneyFlowBanner';
 import { CategoryBreakdown }  from './CategoryBreakdown';
+import { StatementOverview }  from './StatementOverview';
 import { IncomeEditModal }    from './IncomeEditModal';
 import { saveIncome, saveExpensesData, saveGlobalDefaults, monthLabelToKey } from '../../lib/expenses.data';
 
@@ -128,6 +129,7 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
           lastMonthExpenses={lastMonthExpenses}
           savingsRate={savingsRate}
           totalIncome={totalIncome}
+          investable={investable}
           income={income}
           onEditIncome={() => setShowModal(true)}
           onExpensesClick={() => categoryRef.current?.scrollIntoView({ behavior: 'smooth' })}
@@ -144,12 +146,15 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
           month={data.month}
         />
 
-        <div ref={categoryRef} className="expenses-bottom-row" style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 280 }}>
+        <div ref={categoryRef} className="expenses-bottom-row" style={{ display: "flex", gap: 20, alignItems: "stretch", flexWrap: "wrap" }}>
+          <div style={{ flex: 2, minWidth: 280, display: "flex", flexDirection: "column" }}>
             <CategoryBreakdown
               categories={categories}
               onCategoriesChange={(v) => { setCategories(v); persist({ categories: v }); }}
             />
+          </div>
+          <div style={{ flex: 1, minWidth: 260, display: "flex", flexDirection: "column" }}>
+            <StatementOverview categories={categories} />
           </div>
         </div>
       </div>

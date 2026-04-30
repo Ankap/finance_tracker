@@ -30,7 +30,7 @@ function InlineNumberModal({ title, fields, onSave, onClose }) {
   );
 }
 
-export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalIncome, income, onEditIncome, onExpensesClick, onEditLastMonth, onEditExpenses }) {
+export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalIncome, investable, income, onEditIncome, onExpensesClick, onEditLastMonth, onEditExpenses }) {
   const [editingExpenses, setEditingExpenses]   = useState(false);
   const [editingLastMonth, setEditingLastMonth] = useState(false);
 
@@ -57,11 +57,15 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
           </div>
         </div>
 
-        {/* Savings Rate */}
+        {/* Total Savings */}
         <div style={{ flex: 1, minWidth: 220, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "18px 22px" }}>
-          <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginBottom: 6 }}>Savings Rate</div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: "#111827", letterSpacing: "-0.5px", marginBottom: 4 }}>{savingsRate}%</div>
-          <span style={{ color: savingsRate >= 40 ? "#16a34a" : "#d97706", fontSize: 12, fontWeight: 600 }}>{savingsRate >= 40 ? "✓ Above 40% target" : "Below 40% target"}</span>
+          <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginBottom: 6 }}>Total Savings</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: investable >= 0 ? "#111827" : "#dc2626", letterSpacing: "-0.5px", marginBottom: 4 }}>{fmt(Math.abs(investable))}{investable < 0 ? ' deficit' : ''}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: savingsRate >= 40 ? "#16a34a" : "#d97706", fontSize: 12, fontWeight: 600 }}>{savingsRate}% savings rate</span>
+            <span style={{ fontSize: 11, color: "#d1d5db" }}>·</span>
+            <span style={{ fontSize: 12, color: savingsRate >= 40 ? "#16a34a" : "#d97706", fontWeight: 500 }}>{savingsRate >= 40 ? "✓ above target" : "below 40% target"}</span>
+          </div>
         </div>
 
         {/* Total Income */}
