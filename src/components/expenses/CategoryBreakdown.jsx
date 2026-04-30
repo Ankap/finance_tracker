@@ -230,7 +230,7 @@ function CategoryList({ categories, filter, setFilter, onClose, onCategoriesChan
       </div>
 
       {searchTrimmed && filtered.length === 0 && (
-        <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 13, padding: "24px 0", flexShrink: 0 }}>No entries match "{search}"</div>
+        <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 13, padding: "24px 0", flexShrink: 0 }}>No entries match &ldquo;{search}&rdquo;</div>
       )}
 
       <div style={{ overflowY: "auto", flex: 1 }}>
