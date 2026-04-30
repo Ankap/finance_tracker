@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TopStats }           from './TopStats';
 import { MoneyFlowBanner }    from './MoneyFlowBanner';
-import { AIInsights }         from './AIInsights';
 import { CategoryBreakdown }  from './CategoryBreakdown';
 import { IncomeEditModal }    from './IncomeEditModal';
 import { saveIncome, saveExpensesData, saveGlobalDefaults, monthLabelToKey } from '../../lib/expenses.data';
@@ -19,7 +18,6 @@ const BLANK = {
   categories:    [],
   fixedExpenses: [],
   creditCards:   [],
-  aiInsights:    [],
 };
 
 export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
@@ -34,7 +32,6 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
   const [lastMonthExpenses, setLastMonthExpenses] = useState(data.lastMonthExpenses || 0);
   const [accounts, setAccounts]                   = useState(data.accounts || {});
   const [categories, setCategories]               = useState(data.categories || []);
-  const [aiInsights, setAiInsights]               = useState(data.aiInsights || []);
 
   // Re-sync all state when the loaded month data changes
   useEffect(() => {
@@ -46,7 +43,6 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
     setCategories(data.categories || []);
     setFixedExpenses(data.fixedExpenses || []);
     setCreditCards(data.creditCards || []);
-    setAiInsights(data.aiInsights || []);
   }, [data]);
 
   const persist = (patch) => saveExpensesData(data.month, patch);
@@ -67,7 +63,6 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
     setCategories(BLANK.categories);
     setFixedExpenses(BLANK.fixedExpenses);
     setCreditCards(BLANK.creditCards);
-    setAiInsights(BLANK.aiInsights);
   };
 
   const totalIncome  = income.anurag.salary + income.anurag.bonus + income.nidhi.salary + income.nidhi.bonus;
@@ -154,12 +149,6 @@ export function ExpensesClient({ data, months, selectedMonth, onMonthChange }) {
             <CategoryBreakdown
               categories={categories}
               onCategoriesChange={(v) => { setCategories(v); persist({ categories: v }); }}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 280 }}>
-            <AIInsights
-              insights={aiInsights}
-              onInsightsChange={(v) => { setAiInsights(v); persist({ aiInsights: v }); }}
             />
           </div>
         </div>

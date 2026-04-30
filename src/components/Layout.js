@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, TrendingUp, Target, IndianRupee, Upload, X, Sparkles } from 'lucide-react';
+import { Home, TrendingUp, Target, IndianRupee, Upload, X } from 'lucide-react';
+import ChatWidget from './ChatWidget';
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -13,7 +14,6 @@ const Layout = ({ children }) => {
     { path: '/wealth', label: 'Wealth', icon: TrendingUp },
     { path: '/goals', label: 'Goals', icon: Target },
     { path: '/expenses', label: 'Expenses', icon: IndianRupee },
-    { path: '/ai-summary', label: 'AI Summary', icon: Sparkles },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -96,6 +96,9 @@ const Layout = ({ children }) => {
       <main className="max-w-7xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {children}
       </main>
+
+      {/* Floating AI Chat Widget */}
+      <ChatWidget />
 
       {/* Enlarged Photo Modal */}
       {showEnlarged && (
