@@ -50,12 +50,12 @@ async function getAllAssetsAggregated() {
   return Object.values(assetMap);
 }
 
-// Return assets for a specific month. If that month has no entry yet, carry forward
-// the latest known values from all prior months (mirrors income's global fallback).
+// Return assets for a specific month by aggregating all entries up to and including
+// that month. Later months overwrite earlier ones so each asset appears once with
+// its most-recent-known value. This ensures assets added in prior months are always
+// included (carry-forward), and a month that only updated some assets still shows
+// all previously-added assets with their last recorded values.
 async function getAssetsForMonth(monthKey) {
-  const exactData = await readMonthData(monthKey);
-  if (exactData?.assets?.length > 0) return exactData.assets;
-
   const allKeys = await getSortedKeys();
   const targetKey = `assets:${monthKey}`;
   const priorKeys = allKeys.filter(k => k <= targetKey);

@@ -124,12 +124,15 @@ const WealthOverview = () => {
     try {
       if (!silent) setLoading(true);
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
-      const [assetsRes, allAssetsRes] = await Promise.all([
+      // Fetch all owners for the selected month to compute the month-accurate total net worth.
+      // Avoid a duplicate call when no owner filter is active.
+      const [assetsRes, allForMonthRes] = await Promise.all([
         assetsAPI.getAll(ownerFilter, selectedMonth),
-        assetsAPI.getAll(null, null),
+        ownerFilter ? assetsAPI.getAll(null, selectedMonth) : null,
       ]);
+      const allForMonth = ownerFilter ? allForMonthRes.data : assetsRes.data;
       setAssets(assetsRes.data);
-      setTotalNetWorth(allAssetsRes.data.reduce((sum, a) => sum + (a.currentValue || 0), 0));
+      setTotalNetWorth(allForMonth.reduce((sum, a) => sum + (a.currentValue || 0), 0));
     } catch (error) {
       console.error('Error fetching wealth data:', error);
     } finally {
