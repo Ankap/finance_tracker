@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle, Lightbulb, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { CheckCircle, MoreVertical, X, Info, ArrowRight, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { assetsAPI, snapshotsAPI, goalsAPI, transactionsAPI } from '../services/api';
+import { getExpensesData } from '../lib/expenses.data';
 import { formatFullCurrency, formatCurrency, getGoalIcon } from '../utils/formatters';
 
 // --- Financial Health Score Calculation ---
@@ -98,6 +99,7 @@ const DashboardScreen = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
   const [snapshots, setSnapshots] = useState([]);
   const [showHealthModal, setShowHealthModal] = useState(false);
+  const [expenseData, setExpenseData] = useState(null);
 
   const getDateRange = (period) => {
     const end = new Date();
@@ -117,13 +119,15 @@ const DashboardScreen = () => {
     const fetchData = async () => {
       try {
         const { startDate, endDate } = getDateRange(selectedPeriod);
-        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes, allGoalsRes, liveRes] = await Promise.all([
+        const currentMonthLabel = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+        const [snapshotRes, goalsRes, netWorthRes, snapshotsRes, allGoalsRes, liveRes, expRes] = await Promise.all([
           snapshotsAPI.getLatest(),
           goalsAPI.getSummary(),
           assetsAPI.getNetWorth(),
           snapshotsAPI.getAll(startDate, endDate),
           goalsAPI.getAll(),
           transactionsAPI.getLiveMonthlySummary(),
+          getExpensesData(currentMonthLabel),
         ]);
         const live = liveRes.data;
         const baseSnapshot = snapshotRes.data;
@@ -141,6 +145,7 @@ const DashboardScreen = () => {
         setNetWorthData(netWorthRes.data);
         setSnapshots(snapshotsRes.data || []);
         setGoals(allGoalsRes.data || []);
+        setExpenseData(expRes);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -519,100 +524,53 @@ const DashboardScreen = () => {
               </Link>
             </div>
 
-            {/* Key Insights */}
-            <div className="bg-white rounded-2xl p-8 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
-                <Lightbulb className="text-gray-700" size={24} />
-                <h3 className="text-xl font-semibold text-gray-900">Key Insights</h3>
+            {/* Spending Overview */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-xl font-semibold text-gray-900">This Month&apos;s Spending</h3>
+                <Link to="/expenses" className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group">
+                  <span>View all</span>
+                  <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                </Link>
               </div>
-              <div className="space-y-3">
-                {(() => {
-                  const insights = [];
-                  if (growth.netWorthChange) {
-                    insights.push(
-                      <div key="networth" className="flex items-start gap-3">
-                        <div className={`w-8 h-8 ${growth.netWorthChange >= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          {growth.netWorthChange >= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">
-                            Net worth {growth.netWorthChange >= 0 ? 'increased' : 'decreased'} by <span className="font-semibold">{formatCurrency(Math.abs(growth.netWorthChange))}</span>
-                            {growth.netWorthChangePercentage ? ` (${growth.netWorthChangePercentage > 0 ? '+' : ''}${growth.netWorthChangePercentage.toFixed(1)}%)` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (growth.expenseChange) {
-                    insights.push(
-                      <div key="expense" className="flex items-start gap-3">
-                        <div className={`w-8 h-8 ${growth.expenseChange <= 0 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          {growth.expenseChange <= 0 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">
-                            Expenses were <span className="font-semibold">{formatCurrency(Math.abs(growth.expenseChange))}</span> {growth.expenseChange > 0 ? 'higher' : 'lower'} than last month
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (income > 0) {
-                    insights.push(
-                      <div key="savings" className="flex items-start gap-3">
-                        <div className={`w-8 h-8 ${savingsRate >= 30 ? 'bg-teal-100' : 'bg-orange-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          {savingsRate >= 30 ? <CheckCircle className="text-teal-600" size={16} /> : <AlertCircle className="text-orange-500" size={16} />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">
-                            {savingsRate >= 30 ? `Great job! Saving ${savingsRate.toFixed(0)}% of income this month.` : `Savings rate is ${savingsRate.toFixed(0)}%. Aim for at least 30%.`}
-                          </p>
+
+              {!expenseData ? (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Loading...</div>
+              ) : (() => {
+                const allItems = [
+                  ...(expenseData.categories || []).map(c => ({ key: `cat-${c.name}`, name: c.name, amount: c.amount, icon: c.icon || '📌' })),
+                  ...(expenseData.fixedExpenses || []).map(fe => ({ key: `fe-${fe.id}`, name: fe.label, amount: fe.amount, icon: fe.section === 'committed' ? '🔄' : '📌' })),
+                ].sort((a, b) => b.amount - a.amount).slice(0, 10);
+
+                if (!allItems.length) {
+                  return (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
+                      <p className="text-sm text-gray-400">No spending data yet.</p>
+                      <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add your monthly transactions.</p>
+                    </div>
+                  );
+                }
+
+                const maxAmt = allItems[0].amount || 1;
+                return (
+                  <div className="overflow-y-auto max-h-64 space-y-3 pr-1">
+                    {allItems.map(item => (
+                      <div key={item.key} className="flex items-center gap-3">
+                        <span className="text-lg w-7 text-center flex-shrink-0">{item.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-medium text-gray-800 truncate">{item.name}</span>
+                            <span className="text-sm font-semibold text-gray-900 ml-2 flex-shrink-0">{formatFullCurrency(item.amount)}</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-teal-500 rounded-full" style={{ width: `${(item.amount / maxAmt) * 100}%` }} />
+                          </div>
                         </div>
                       </div>
-                    );
-                  }
-                  if (goalsSummary && goalsSummary.behind > 0) {
-                    insights.push(
-                      <div key="goals" className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <AlertCircle className="text-orange-500" size={16} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">{goalsSummary.behind} of {goalsSummary.total} goals behind schedule</p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const assetTypes = Object.keys(netWorthData?.breakdown || {}).length;
-                  if (assetTypes > 0) {
-                    insights.push(
-                      <div key="diversification" className="flex items-start gap-3">
-                        <div className={`w-8 h-8 ${assetTypes >= 5 ? 'bg-teal-100' : 'bg-blue-100'} rounded-full flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          <CheckCircle className={assetTypes >= 5 ? 'text-teal-600' : 'text-blue-600'} size={16} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">
-                            {assetTypes >= 5 ? `Excellent diversification across ${assetTypes} asset types` : `Portfolio spread across ${assetTypes} asset type${assetTypes !== 1 ? 's' : ''}`}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (insights.length === 0) {
-                    return (
-                      <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-                        <p className="text-sm text-gray-400">No insights yet.</p>
-                        <p className="text-xs text-gray-400">Add income, expenses, and assets to see your personalised insights.</p>
-                      </div>
-                    );
-                  }
-                  return insights.slice(0, 5);
-                })()}
-              </div>
-              <Link to="/ai-summary" className="mt-6 flex items-center justify-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors group">
-                <span>View all insights</span>
-                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
           </div>
