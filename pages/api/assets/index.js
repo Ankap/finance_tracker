@@ -1,5 +1,16 @@
 import { kv } from '@vercel/kv';
 
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function parseMonthParam(monthStr) {
+  const parts = monthStr.trim().split(' ');
+  if (parts.length !== 2) return null;
+  const [monthName, year] = parts;
+  const idx = MONTH_NAMES.indexOf(monthName);
+  if (idx === -1) return null;
+  return `${year}_${String(idx + 1).padStart(2, '0')}`;
+}
+
 function getCurrentMonthKey() {
   const now = new Date();
   const year = now.getFullYear();
@@ -39,6 +50,30 @@ async function getAllAssetsAggregated() {
   return Object.values(assetMap);
 }
 
+// Return assets for a specific month. If that month has no entry yet, carry forward
+// the latest known values from all prior months (mirrors income's global fallback).
+async function getAssetsForMonth(monthKey) {
+  const exactData = await readMonthData(monthKey);
+  if (exactData?.assets?.length > 0) return exactData.assets;
+
+  const allKeys = await getSortedKeys();
+  const targetKey = `assets:${monthKey}`;
+  const priorKeys = allKeys.filter(k => k <= targetKey);
+
+  if (priorKeys.length === 0) return [];
+
+  const assetMap = {};
+  for (const key of priorKeys) {
+    const d = await kv.get(key);
+    if (d?.assets) {
+      for (const asset of d.assets) {
+        assetMap[asset._id] = asset;
+      }
+    }
+  }
+  return Object.values(assetMap);
+}
+
 // Get or create the current month's KV entry.
 async function getOrCreateCurrentMonthData() {
   const monthKey = getCurrentMonthKey();
@@ -62,6 +97,13 @@ async function getOrCreateCurrentMonthData() {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
+      const { month } = req.query;
+      if (month) {
+        const monthKey = parseMonthParam(month);
+        if (!monthKey) return res.status(400).json({ error: 'Invalid month format' });
+        const assets = await getAssetsForMonth(monthKey);
+        return res.status(200).json({ data: assets });
+      }
       const assets = await getAllAssetsAggregated();
       return res.status(200).json({ data: assets });
     }
@@ -116,6 +158,23 @@ export default async function handler(req, res) {
           accountDetails: '',
           monthlySnapshots: [{ value: currentValue, returnPercentage: 0, date: new Date().toISOString() }],
         });
+      } else if (action === 'update') {
+        // Update metadata (name, owner, accountDetails) across ALL monthly entries so history stays consistent.
+        const { assetId: updateId, name: newName, owner: newOwner, accountDetails: newDetails } = req.body;
+        const allKeys = await getSortedKeys();
+        for (const key of allKeys) {
+          const monthData = await kv.get(key);
+          if (monthData?.assets) {
+            const idx = monthData.assets.findIndex(a => a._id === updateId);
+            if (idx >= 0) {
+              if (newName !== undefined)    monthData.assets[idx].name           = newName;
+              if (newOwner !== undefined)   monthData.assets[idx].owner          = newOwner;
+              if (newDetails !== undefined) monthData.assets[idx].accountDetails = newDetails;
+              await kv.set(key, { ...monthData, lastUpdated: new Date().toISOString() });
+            }
+          }
+        }
+        return res.status(200).json({ data: { success: true } });
       } else if (action === 'delete') {
         const { assetId } = req.body;
         // Remove the asset from every monthly KV entry

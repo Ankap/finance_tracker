@@ -21,11 +21,12 @@ function EditAssetModal({ asset, onSave, onClose }) {
   const [name, setName]               = useState(asset.name);
   const [owner, setOwner]             = useState(asset.owner || 'Joint');
   const [accountDetails, setDetails]  = useState(asset.accountDetails || '');
+  const [currentValue, setValue]      = useState(asset.currentValue ?? '');
   const [saving, setSaving]           = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ name, owner, accountDetails });
+    await onSave({ name, owner, accountDetails, currentValue: Number(currentValue) });
     setSaving(false);
   };
 
@@ -85,6 +86,18 @@ function EditAssetModal({ asset, onSave, onClose }) {
               onChange={e => setDetails(e.target.value)}
             />
           </div>
+          {/* Current value */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Current Value (₹)</label>
+            <input
+              type="number"
+              min="0"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:border-sage-400"
+              placeholder="e.g. 500000"
+              value={currentValue}
+              onChange={e => setValue(e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex gap-3 p-5 pt-0">
           <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
@@ -99,7 +112,7 @@ function EditAssetModal({ asset, onSave, onClose }) {
 
 const WealthOverview = () => {
   const [assets, setAssets] = useState([]);
-  const [netWorthData, setNetWorthData] = useState(null);
+  const [totalNetWorth, setTotalNetWorth] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedOwner, setSelectedOwner] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[0]);
@@ -107,20 +120,20 @@ const WealthOverview = () => {
   const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null);
   const [editingAsset, setEditingAsset]             = useState(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
-      const [assetsRes, netWorthRes] = await Promise.all([
+      const [assetsRes, allAssetsRes] = await Promise.all([
         assetsAPI.getAll(ownerFilter, selectedMonth),
-        assetsAPI.getNetWorth(ownerFilter, selectedMonth),
+        assetsAPI.getAll(null, null),
       ]);
       setAssets(assetsRes.data);
-      setNetWorthData(netWorthRes.data);
+      setTotalNetWorth(allAssetsRes.data.reduce((sum, a) => sum + (a.currentValue || 0), 0));
     } catch (error) {
       console.error('Error fetching wealth data:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [selectedOwner, selectedMonth]);
 
@@ -136,8 +149,10 @@ const WealthOverview = () => {
     );
   }
 
-  const chartData = netWorthData?.breakdown
-    ? Object.entries(netWorthData.breakdown).map(([name, value]) => ({ name, value }))
+  const chartData = assets.length > 0
+    ? Object.entries(
+        assets.reduce((acc, a) => { acc[a.name] = (acc[a.name] || 0) + a.currentValue; return acc; }, {})
+      ).map(([name, value]) => ({ name, value }))
     : [];
 
   const COLORS = ['#5f6f5f', '#7d8d7d', '#a3afa3', '#c7cfc7', '#86efac', '#4ade80'];
@@ -171,20 +186,34 @@ const WealthOverview = () => {
     return snaps[snaps.length - 1].value - snaps[snaps.length - 2].value;
   })();
 
-  const handleEdit = async (patch) => {
-    const { _id } = editingAsset;
+  const handleEdit = async ({ currentValue, ...metaPatch }) => {
+    const { _id, currentValue: oldValue } = editingAsset;
     setEditingAsset(null);
-    await assetsAPI.update(_id, patch);
-    fetchData();
+
+    // Optimistic update — reflect changes immediately
+    setAssets(prev => prev.map(a => a._id === _id ? { ...a, ...metaPatch, currentValue } : a));
+    setTotalNetWorth(prev => prev + (currentValue - oldValue));
+
+    const calls = [assetsAPI.update(_id, metaPatch)];
+    if (currentValue !== oldValue) {
+      calls.push(assetsAPI.addSnapshot(_id, { value: currentValue }));
+    }
+    await Promise.all(calls);
+    fetchData(true);
   };
 
   const handleDelete = async () => {
     if (!confirmDeleteAsset) return;
     const { _id } = confirmDeleteAsset;
+    const deletedAsset = assets.find(a => a._id === _id);
     setConfirmDeleteAsset(null);
+
+    // Optimistic update — reflect changes immediately
     setAssets(prev => prev.filter(a => a._id !== _id));
+    setTotalNetWorth(prev => prev - (deletedAsset?.currentValue || 0));
+
     await assetsAPI.delete(_id);
-    fetchData();
+    fetchData(true);
   };
 
   return (
@@ -238,7 +267,7 @@ const WealthOverview = () => {
             <div>
               <p className="text-sm text-gray-500">Total Net Worth</p>
               <p className="text-3xl font-bold text-gray-900">
-                {formatCurrency(netWorthData?.totalNetWorth || 0, true)}
+                {formatCurrency(totalNetWorth, true)}
               </p>
             </div>
             {topPerformer && (

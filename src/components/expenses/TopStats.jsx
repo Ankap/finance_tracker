@@ -31,8 +31,7 @@ function InlineNumberModal({ title, fields, onSave, onClose }) {
 }
 
 export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalIncome, investable, income, onEditIncome, onExpensesClick, onEditLastMonth, onEditExpenses }) {
-  const [editingExpenses, setEditingExpenses]   = useState(false);
-  const [editingLastMonth, setEditingLastMonth] = useState(false);
+  const [editingExpenses, setEditingExpenses] = useState(false);
 
   const delta = totalExpenses - lastMonthExpenses;
   const down  = delta < 0;
@@ -58,16 +57,10 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
 
         {/* Total Expenses */}
         <div style={{ flex: 1, minWidth: 220, background: "linear-gradient(135deg, #fff7ed 0%, #fff 70%)", border: "1px solid #fed7aa", borderRadius: 12, padding: "18px 22px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600, marginBottom: 6 }}>Total Expenses</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setEditingExpenses(true)} style={{ fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fff", border: "1px solid #fed7aa", borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>✎ Edit</button>
-            </div>
-          </div>
+          <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600, marginBottom: 6 }}>Total Expenses</div>
           <div onClick={onExpensesClick} style={{ fontSize: 26, fontWeight: 700, color: "#92400e", letterSpacing: "-0.5px", marginBottom: 4, cursor: onExpensesClick ? "pointer" : "default" }}>{fmt(totalExpenses)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ color: down ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 600 }}>{down ? `↓ ${fmt(Math.abs(delta))} vs last month` : `↑ ${fmt(delta)} vs last month`}</span>
-            <button onClick={() => setEditingLastMonth(true)} title="Edit last month" style={{ fontSize: 10, color: "#9ca3af", background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 5px", cursor: "pointer" }}>✎</button>
           </div>
         </div>
 
@@ -94,15 +87,6 @@ export function TopStats({ totalExpenses, lastMonthExpenses, savingsRate, totalI
           ]}
           onSave={(vals) => onEditExpenses({ joint: vals.joint, anurag: vals.anurag, nidhi: vals.nidhi })}
           onClose={() => setEditingExpenses(false)}
-        />
-      )}
-
-      {editingLastMonth && (
-        <InlineNumberModal
-          title="Edit Last Month Expenses"
-          fields={[{ key: "amount", label: "Last Month Total Expenses", value: lastMonthExpenses }]}
-          onSave={(vals) => onEditLastMonth(vals.amount)}
-          onClose={() => setEditingLastMonth(false)}
         />
       )}
     </>
