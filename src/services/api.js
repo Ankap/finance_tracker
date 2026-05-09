@@ -385,8 +385,41 @@ export const transactionsAPI = {
 };
 
 export const snapshotsAPI = {
-  getAll: () => Promise.resolve({ data: [] }),
-  getLatest: () => Promise.resolve({ data: null }),
+  getAll: async (startDate = null, endDate = null) => {
+    try {
+      const res = await fetch('/api/networth');
+      if (!res.ok) throw new Error('API unavailable');
+      const json = await res.json();
+      let records = (json.data || []).map(r => ({
+        date: r.date,
+        netWorth: r.totalNetWorth,
+        breakdown: r.breakdown,
+      }));
+      if (startDate) records = records.filter(r => r.date >= startDate.substring(0, 7));
+      if (endDate)   records = records.filter(r => r.date <= endDate.substring(0, 7));
+      return { data: records };
+    } catch {
+      return { data: [] };
+    }
+  },
+  getLatest: async () => {
+    try {
+      const res = await fetch('/api/networth');
+      if (!res.ok) throw new Error('API unavailable');
+      const json = await res.json();
+      const records = (json.data || []).sort((a, b) => a.date.localeCompare(b.date));
+      if (records.length === 0) return { data: null };
+      const latest = records[records.length - 1];
+      const prev   = records.length > 1 ? records[records.length - 2] : null;
+      const netWorthChange = prev ? latest.totalNetWorth - prev.totalNetWorth : 0;
+      const netWorthChangePercentage = prev && prev.totalNetWorth > 0
+        ? parseFloat(((netWorthChange / prev.totalNetWorth) * 100).toFixed(1))
+        : 0;
+      return { data: { growth: { netWorthChange, netWorthChangePercentage } } };
+    } catch {
+      return { data: null };
+    }
+  },
   getById: () => Promise.resolve({ data: null }),
   create: () => Promise.resolve({ data: { success: true } }),
   update: () => Promise.resolve({ data: { success: true } }),
