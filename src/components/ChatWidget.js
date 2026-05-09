@@ -163,8 +163,9 @@ const INITIAL_MESSAGES = [
   },
 ];
 
-const ChatWidget = () => {
-  const [open, setOpen] = useState(false);
+const ChatWidget = ({ isOpen, setIsOpen }) => {
+  const open = isOpen !== undefined ? isOpen : false;
+  const setOpen = setIsOpen || (() => {});
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -197,24 +198,9 @@ const ChatWidget = () => {
 
   return (
     <>
-      {/* Floating button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="relative flex items-center justify-center bg-transparent border-none outline-none cursor-pointer p-0"
-          style={{}}
-          title="AI Finance Assistant"
-        >
-          {open
-            ? <div style={{background:'#3c483c'}} className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"><X size={22} className="text-white" /></div>
-            : <RobotFace size={50 } />
-          }
-        </button>
-      </div>
-
       {/* Chat modal */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+        <div className="fixed top-[68px] right-4 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
           style={{ height: 480 }}
         >
           {/* Header */}

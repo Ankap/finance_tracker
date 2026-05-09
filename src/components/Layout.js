@@ -3,11 +3,42 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, TrendingUp, Target, IndianRupee, Upload, X } from 'lucide-react';
 import ChatWidget from './ChatWidget';
 
+function RobotFaceHeader() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="11" y1="26" x2="3" y2="12" stroke="#5f6f5f" strokeWidth="3.5" strokeLinecap="round" />
+      <circle cx="3" cy="10" r="3.5" fill="#4a594a" />
+      <line x1="45" y1="26" x2="53" y2="12" stroke="#5f6f5f" strokeWidth="3.5" strokeLinecap="round" />
+      <circle cx="53" cy="10" r="3.5" fill="#4a594a" />
+      <line x1="28" y1="4" x2="28" y2="11" stroke="#4a594a" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="28" cy="3" r="3.2" fill="#22c55e" />
+      <rect x="10" y="11" width="36" height="30" rx="8" fill="url(#rgh)" />
+      <rect x="10" y="11" width="36" height="30" rx="8" stroke="#3c483c" strokeWidth="1.5" fill="none" />
+      <circle cx="21" cy="24" r="5.5" fill="white" />
+      <circle cx="35" cy="24" r="5.5" fill="white" />
+      <circle cx="22" cy="23" r="2.2" fill="#16a34a" />
+      <circle cx="36" cy="23" r="2.2" fill="#16a34a" />
+      <circle cx="23.2" cy="21.8" r="0.9" fill="white" />
+      <circle cx="37.2" cy="21.8" r="0.9" fill="white" />
+      <path d="M19 32 Q28 38 37 32" stroke="#86efac" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+      <circle cx="10" cy="27" r="2.8" fill="#22c55e" />
+      <circle cx="46" cy="27" r="2.8" fill="#22c55e" />
+      <defs>
+        <linearGradient id="rgh" x1="10" y1="11" x2="46" y2="41" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#4a594a" />
+          <stop offset="100%" stopColor="#3c483c" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 const Layout = ({ children }) => {
   const location = useLocation();
   const [showEnlarged, setShowEnlarged] = useState(false);
   const [showGhibli, setShowGhibli] = useState(false);
   const [ghibliMissing, setGhibliMissing] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const navItems = [
     { path: '/', label: 'Overview', icon: Home },
@@ -61,13 +92,27 @@ const Layout = ({ children }) => {
               ))}
             </nav>
 
-            <Link
-              to="/update"
-              className="btn-primary flex items-center gap-2 text-sm"
-            >
-              <Upload size={16} />
-              <span className="hidden sm:inline">Update Data</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setChatOpen(v => !v)}
+                title="AI Finance Assistant"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                  chatOpen
+                    ? 'bg-sage-800 text-white border-sage-800'
+                    : 'bg-white text-sage-700 border-sage-200 hover:bg-sage-50 hover:border-sage-300'
+                }`}
+              >
+                <RobotFaceHeader />
+                <span className="hidden sm:inline">AI Advisor</span>
+              </button>
+              <Link
+                to="/update"
+                className="btn-primary flex items-center gap-2 text-sm"
+              >
+                <Upload size={16} />
+                <span className="hidden sm:inline">Update Data</span>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -97,8 +142,8 @@ const Layout = ({ children }) => {
         {children}
       </main>
 
-      {/* Floating AI Chat Widget */}
-      <ChatWidget />
+      {/* AI Chat Widget (controlled from header) */}
+      <ChatWidget isOpen={chatOpen} setIsOpen={setChatOpen} />
 
       {/* Enlarged Photo Modal */}
       {showEnlarged && (
