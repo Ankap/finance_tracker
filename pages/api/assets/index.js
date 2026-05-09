@@ -74,6 +74,26 @@ async function getAssetsForMonth(monthKey) {
   return Object.values(assetMap);
 }
 
+// Compute and persist a networth snapshot for the given month to networth:YYYY_MM.
+async function saveNetworthSnapshot(monthKey) {
+  const assets = await getAssetsForMonth(monthKey);
+  const totalNetWorth = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
+  const breakdown = {};
+  for (const asset of assets) {
+    breakdown[asset.name] = (breakdown[asset.name] || 0) + (asset.currentValue || 0);
+  }
+  const [year, mo] = monthKey.split('_').map(Number);
+  await kv.set(`networth:${monthKey}`, {
+    year,
+    month: mo,
+    date: `${year}-${String(mo).padStart(2, '0')}`,
+    monthKey,
+    totalNetWorth,
+    breakdown,
+    lastUpdated: new Date().toISOString(),
+  });
+}
+
 // Get or create the current month's KV entry.
 async function getOrCreateCurrentMonthData() {
   const monthKey = getCurrentMonthKey();
@@ -193,6 +213,9 @@ export default async function handler(req, res) {
 
       fileData.lastUpdated = new Date().toISOString();
       await kv.set(`assets:${monthKey}`, fileData);
+
+      // Persist a dedicated networth snapshot so the agent can query it by month.
+      await saveNetworthSnapshot(monthKey);
 
       return res.status(200).json({ data: { success: true } });
     }

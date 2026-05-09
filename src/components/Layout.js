@@ -103,7 +103,7 @@ const Layout = ({ children }) => {
                 }`}
               >
                 <RobotFaceHeader />
-                <span className="hidden sm:inline">AI Advisor</span>
+                <span className="hidden sm:inline">NestChat</span>
               </button>
               <Link
                 to="/update"

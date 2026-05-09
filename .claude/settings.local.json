@@ -6,7 +6,9 @@
       "Bash(python -c \":*)",
       "Bash(node -e \":*)",
       "Bash(node -e \"require\\(''xlsx''\\); console.log\\(''OK''\\)\")",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(npm run *)",
+      "Read(//tmp/**)"
     ]
   }
 }
