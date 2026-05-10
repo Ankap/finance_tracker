@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Sparkles, Maximize2, X, Trash2, Pencil } from 'lucide-react';
+import { TrendingUp, TrendingDown, Sparkles, Maximize2, X, Trash2, Pencil } from 'lucide-react';
 import { assetsAPI } from '../services/api';
 import { formatCurrency, formatPercentage, getAssetIcon, formatDate } from '../utils/formatters';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -113,6 +113,8 @@ function EditAssetModal({ asset, onSave, onClose }) {
 const WealthOverview = () => {
   const [assets, setAssets] = useState([]);
   const [totalNetWorth, setTotalNetWorth] = useState(0);
+  const [nwChange, setNwChange] = useState(0);
+  const [nwChangePct, setNwChangePct] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedOwner, setSelectedOwner] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[0]);
@@ -124,15 +126,25 @@ const WealthOverview = () => {
     try {
       if (!silent) setLoading(true);
       const ownerFilter = selectedOwner === 'All' ? null : selectedOwner;
-      // Fetch all owners for the selected month to compute the month-accurate total net worth.
-      // Avoid a duplicate call when no owner filter is active.
-      const [assetsRes, allForMonthRes] = await Promise.all([
+      const selectedIdx = MONTHS.indexOf(selectedMonth);
+      const prevMonthLabel = selectedIdx >= 0 && selectedIdx + 1 < MONTHS.length ? MONTHS[selectedIdx + 1] : null;
+
+      const [assetsRes, allForMonthRes, prevNWRes] = await Promise.all([
         assetsAPI.getAll(ownerFilter, selectedMonth),
         ownerFilter ? assetsAPI.getAll(null, selectedMonth) : null,
+        prevMonthLabel ? assetsAPI.getNetWorth(null, prevMonthLabel) : Promise.resolve({ data: null }),
       ]);
+
       const allForMonth = ownerFilter ? allForMonthRes.data : assetsRes.data;
+      const currentNW = allForMonth.reduce((sum, a) => sum + (a.currentValue || 0), 0);
+      const prevNW = prevNWRes?.data?.totalNetWorth || 0;
+      const change = prevNW > 0 ? currentNW - prevNW : 0;
+      const changePct = prevNW > 0 ? (change / prevNW) * 100 : 0;
+
       setAssets(assetsRes.data);
-      setTotalNetWorth(allForMonth.reduce((sum, a) => sum + (a.currentValue || 0), 0));
+      setTotalNetWorth(currentNW);
+      setNwChange(change);
+      setNwChangePct(changePct);
     } catch (error) {
       console.error('Error fetching wealth data:', error);
     } finally {
@@ -273,13 +285,16 @@ const WealthOverview = () => {
                 {formatCurrency(totalNetWorth, true)}
               </p>
             </div>
-            {topPerformer && (
-              <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-3 py-1.5 rounded-xl">
-                <TrendingUp size={16} />
+            {nwChange !== 0 ? (
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${nwChange > 0 ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
+                {nwChange > 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                 <span className="text-sm font-semibold">
-                  {formatPercentage(topPerformerReturn)} this month
+                  {nwChange > 0 ? '+' : ''}{formatCurrency(nwChange, true)}{' '}
+                  {nwChangePct > 0 ? '+' : ''}{nwChangePct.toFixed(1)}% vs last month
                 </span>
               </div>
+            ) : (
+              <span className="text-xs text-gray-400">No prior month comparison yet</span>
             )}
           </div>
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { assetsAPI, snapshotsAPI, goalsAPI, transactionsAPI } from '../services/api';
+import { assetsAPI, goalsAPI, transactionsAPI } from '../services/api';
 import { getExpensesData } from '../lib/expenses.data';
 import { formatFullCurrency, formatCurrency } from '../utils/formatters';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart } from 'recharts';
 
 // --- Component ---
 
@@ -14,33 +15,59 @@ const DashboardScreen = () => {
   const [netWorthData, setNetWorthData] = useState(null);
   const [goals, setGoals] = useState([]);
   const [expenseData, setExpenseData] = useState(null);
+  const [trendHistory, setTrendHistory] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const currentMonthLabel = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-        const [snapshotRes, netWorthRes, allGoalsRes, liveRes, expRes] = await Promise.all([
-          snapshotsAPI.getLatest(),
+        const now = new Date();
+        const currentMonthLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+
+        // Last 6 months oldest→newest (same format WealthOverview uses for its month selector)
+        const last6MonthDates = Array.from({ length: 6 }, (_, i) =>
+          new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+        );
+
+        const [netWorthRes, allGoalsRes, liveRes, expRes, ...monthNWResults] = await Promise.all([
           assetsAPI.getNetWorth(),
           goalsAPI.getAll(),
           transactionsAPI.getLiveMonthlySummary(),
           getExpensesData(currentMonthLabel),
+          ...last6MonthDates.map(d =>
+            assetsAPI.getNetWorth(null, d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }))
+          ),
         ]);
+
         const live = liveRes.data;
-        const baseSnapshot = snapshotRes.data;
+
+        // Derive MoM net worth change from asset data (same source as WealthOverview)
+        const currNW = monthNWResults[5]?.data?.totalNetWorth || 0;
+        const prevNW = monthNWResults[4]?.data?.totalNetWorth || 0;
+        const netWorthChange = (currNW > 0 && prevNW > 0) ? currNW - prevNW : 0;
+        const netWorthChangePercentage = (prevNW > 0 && netWorthChange !== 0)
+          ? parseFloat(((netWorthChange / prevNW) * 100).toFixed(1))
+          : 0;
+
         const mergedSnapshot = live ? {
-          ...baseSnapshot,
           snapshot: live.snapshot,
           growth: {
-            ...baseSnapshot?.growth,
-            expenseChange:    live.growth.expenseChange,
+            netWorthChange,
+            netWorthChangePercentage,
+            expenseChange:     live.growth.expenseChange,
             savingsRateChange: live.growth.savingsRateChange,
           },
-        } : baseSnapshot;
+        } : { growth: { netWorthChange, netWorthChangePercentage } };
+
         setSnapshotData(mergedSnapshot);
         setNetWorthData(netWorthRes.data);
         setGoals(allGoalsRes.data || []);
         setExpenseData(expRes);
+
+        const history = last6MonthDates.map((d, i) => ({
+          month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
+          netWorth: monthNWResults[i]?.data?.totalNetWorth || null,
+        }));
+        setTrendHistory(history);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -98,57 +125,36 @@ const DashboardScreen = () => {
             </Link>
           </div>
 
-          {/* Dummy MoM area chart */}
-          {(() => {
-            const W = 500, H = 130;
-            const multipliers = [0.66, 0.71, 0.69, 0.74, 0.79, 0.85, 0.92, 1.0];
-            const base = totalNetWorth || 8800000;
-            const values = multipliers.map(m => Math.round(base * m));
-            const months = Array.from({ length: 8 }, (_, i) => {
-              const d = new Date();
-              d.setMonth(d.getMonth() - (7 - i));
-              return d.toLocaleString('en-IN', { month: 'short' });
-            });
-            const minV = Math.min(...values) * 0.97;
-            const maxV = Math.max(...values) * 1.01;
-            const range = maxV - minV;
-            const pad = { t: 10, r: 8, b: 24, l: 8 };
-            const cW = W - pad.l - pad.r;
-            const cH = H - pad.t - pad.b;
-            const pts = values.map((v, i) => ({
-              x: pad.l + (i / (values.length - 1)) * cW,
-              y: pad.t + (1 - (v - minV) / range) * cH,
-              month: months[i],
-              value: v,
-            }));
-            const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-            const area = `${line} L${pts[pts.length - 1].x},${H - pad.b} L${pts[0].x},${H - pad.b} Z`;
-            return (
-              <div className="mt-5 flex-1">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Monthly Trend</p>
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: H }}>
+          {/* Monthly Trend chart */}
+          <div className="mt-5 flex-1">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Monthly Trend</p>
+            {trendHistory.every(r => r.netWorth === null) ? (
+              <div className="flex items-center justify-center h-28 text-xs text-gray-400">
+                No history yet — record net worth monthly via Update Data.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={120}>
+                <AreaChart data={trendHistory} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="nwGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="#0d9488" stopOpacity="0.22" />
-                      <stop offset="100%" stopColor="#0d9488" stopOpacity="0.01" />
+                    <linearGradient id="nwGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0d9488" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="#0d9488" stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
-                  <path d={area} fill="url(#nwGrad)" />
-                  <path d={line} fill="none" stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {pts.map((p, i) => (
-                    i === pts.length - 1
-                      ? <circle key={i} cx={p.x} cy={p.y} r="4" fill="#0d9488" />
-                      : <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#0d9488" opacity="0.4" />
-                  ))}
-                  {pts.map((p, i) => (
-                    <text key={i} x={p.x} y={H - 6} textAnchor="middle" fill="#9ca3af" fontSize="9">
-                      {p.month}
-                    </text>
-                  ))}
-                </svg>
-              </div>
-            );
-          })()}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip
+                    formatter={(value) => [formatFullCurrency(value), 'Net Worth']}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                    labelStyle={{ fontWeight: 600, color: '#374151' }}
+                    cursor={{ stroke: '#0d9488', strokeWidth: 1, strokeDasharray: '4 2' }}
+                  />
+                  <Area type="monotone" dataKey="netWorth" stroke="#0d9488" strokeWidth={2.5} fill="url(#nwGrad)" dot={{ r: 2.5, fill: '#0d9488', strokeWidth: 0 }} activeDot={{ r: 4.5, fill: '#0d9488', strokeWidth: 0 }} connectNulls={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
 
         {/* Right: Portfolio Mix — horizontal row */}

@@ -385,6 +385,18 @@ export const transactionsAPI = {
 };
 
 export const snapshotsAPI = {
+  save: async (month, totalNetWorth) => {
+    try {
+      const res = await fetch('/api/networth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, totalNetWorth }),
+      });
+      return res.json();
+    } catch {
+      return { data: null };
+    }
+  },
   getAll: async (startDate = null, endDate = null) => {
     try {
       const res = await fetch('/api/networth');

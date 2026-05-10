@@ -32,6 +32,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: results.filter(Boolean) });
     }
 
+    if (req.method === 'POST') {
+      const { month, totalNetWorth, breakdown } = req.body;
+      if (!month || totalNetWorth == null) {
+        return res.status(400).json({ error: 'month and totalNetWorth are required.' });
+      }
+      const monthKey = parseMonthParam(month);
+      if (!monthKey) {
+        return res.status(400).json({ error: 'Invalid month format. Use "YYYY_MM" or "Month YYYY".' });
+      }
+      const [year, mo] = monthKey.split('_').map(Number);
+      const record = {
+        year,
+        month: mo,
+        date: `${year}-${String(mo).padStart(2, '0')}`,
+        monthKey,
+        totalNetWorth: Number(totalNetWorth),
+        breakdown: breakdown || {},
+        lastUpdated: new Date().toISOString(),
+      };
+      await kv.set(`networth:${monthKey}`, record);
+      return res.status(200).json({ data: record });
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('Networth API error:', err);

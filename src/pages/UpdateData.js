@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, TrendingUp, FileText, Check, Sparkles, X } from 'lucide-react';
-import { assetsAPI } from '../services/api';
+import { Upload, TrendingUp, FileText, Check, Sparkles, X, IndianRupee } from 'lucide-react';
+import { assetsAPI, snapshotsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 // ── Paytm category → icon mapping ──────────────────────────────────────────
@@ -375,6 +375,62 @@ const UpdateData = () => {
     statementType: 'Bank Statement',
   });
 
+  // Net worth state
+  const [nwMonths]                        = useState(() => {
+    const months = [];
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        label: d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+        key:   `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, '0')}`,
+      });
+    }
+    return months;
+  });
+  const [nwForm, setNwForm]               = useState({ month: '', amount: '' });
+  const [nwLoading, setNwLoading]         = useState(false);
+  const [nwSuccess, setNwSuccess]         = useState(false);
+  const [nwHistory, setNwHistory]         = useState([]);
+  const [nwHistoryLoading, setNwHistoryLoading] = useState(false);
+
+  const fetchNwHistory = async () => {
+    setNwHistoryLoading(true);
+    try {
+      const res = await snapshotsAPI.getAll();
+      const records = (res.data || [])
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 12);
+      setNwHistory(records);
+    } catch {
+      // ignore
+    } finally {
+      setNwHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'networth') fetchNwHistory();
+  }, [activeTab]);
+
+  const handleSaveNetWorth = async (e) => {
+    e.preventDefault();
+    if (!nwForm.month || !nwForm.amount) return;
+    setNwLoading(true);
+    setNwSuccess(false);
+    try {
+      await snapshotsAPI.save(nwForm.month, parseFloat(nwForm.amount));
+      setNwSuccess(true);
+      setNwForm({ month: '', amount: '' });
+      fetchNwHistory();
+      setTimeout(() => setNwSuccess(false), 3000);
+    } catch {
+      alert('Failed to save. Please try again.');
+    } finally {
+      setNwLoading(false);
+    }
+  };
+
   // ── Asset update ────────────────────────────────────────────────────────
   const handleUpdateAsset = async (e) => {
     e.preventDefault();
@@ -613,8 +669,9 @@ const UpdateData = () => {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #e5e7eb' }}>
         {[
-          { id: 'assets',     Icon: TrendingUp, label: 'Update Assets'    },
-          { id: 'statements', Icon: FileText,   label: 'Upload Statements' },
+          { id: 'assets',     Icon: TrendingUp,   label: 'Update Assets'     },
+          { id: 'networth',   Icon: IndianRupee,  label: 'Record Net Worth'  },
+          { id: 'statements', Icon: FileText,     label: 'Upload Statements' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -734,6 +791,104 @@ const UpdateData = () => {
           </div>
 
         </form>
+      )}
+
+      {/* ── Record Net Worth ── */}
+      {activeTab === 'networth' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          <form onSubmit={handleSaveNetWorth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', gap: 16 }}>
+
+              {/* Month */}
+              <div style={{ ...card, flex: 1 }}>
+                <span style={label}>Month</span>
+                <select
+                  value={nwForm.month}
+                  onChange={e => setNwForm(f => ({ ...f, month: e.target.value }))}
+                  style={{ ...input, cursor: 'pointer', appearance: 'none' }}
+                  required
+                >
+                  <option value="">Select month…</option>
+                  {nwMonths.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Total Net Worth */}
+              <div style={{ ...card, flex: 1 }}>
+                <span style={label}>Total Net Worth</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14, fontWeight: 600, pointerEvents: 'none' }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={nwForm.amount}
+                    onChange={e => setNwForm(f => ({ ...f, amount: e.target.value }))}
+                    style={{ ...input, paddingLeft: 28 }}
+                    placeholder="77,50,000"
+                    required
+                  />
+                </div>
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                  Enter your <strong>total cumulative net worth</strong> — not just this month's change.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <button
+                type="submit"
+                disabled={nwLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, border: 'none', background: '#3d6b4f', color: '#fff', fontSize: 14, fontWeight: 700, cursor: nwLoading ? 'not-allowed' : 'pointer', opacity: nwLoading ? 0.75 : 1 }}
+              >
+                {nwLoading
+                  ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />Saving…</>
+                  : <>✓ Save Net Worth</>
+                }
+              </button>
+              {nwSuccess && <span style={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>✓ Saved successfully</span>}
+            </div>
+          </form>
+
+          {/* History */}
+          <div style={card}>
+            <span style={label}>Recent History</span>
+            {nwHistoryLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: 13 }}>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-gray-500" />
+                Loading…
+              </div>
+            ) : nwHistory.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontSize: 13 }}>No records yet. Start by saving your first month above.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {nwHistory.map((r, i) => {
+                  const prev = nwHistory[i + 1];
+                  const change = prev ? r.totalNetWorth - prev.totalNetWorth : null;
+                  const [yr, mo] = r.date.split('-').map(Number);
+                  const lbl = new Date(yr, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+                  return (
+                    <div key={r.date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < nwHistory.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                      <span style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>{lbl}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {change !== null && (
+                          <span style={{ fontSize: 12, fontWeight: 600, color: change >= 0 ? '#16a34a' : '#dc2626' }}>
+                            {change >= 0 ? '+' : ''}₹{Math.abs(change).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>
+                          ₹{r.totalNetWorth.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Upload Statements ── */}
