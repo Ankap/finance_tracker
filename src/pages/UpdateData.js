@@ -832,7 +832,7 @@ const UpdateData = () => {
                   />
                 </div>
                 <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
-                  Enter your <strong>total cumulative net worth</strong> — not just this month's change.
+                  Enter your <strong>total cumulative net worth</strong> — not just this month&apos;s change.
                 </p>
               </div>
             </div>
