@@ -355,10 +355,10 @@ const WealthOverview = () => {
       </div>
 
       {/* ── Chart + Assets ── */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'stretch', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'stretch', flexWrap: 'wrap', height: 320 }}>
 
         {/* Asset Allocation Chart */}
-        <div style={{ flex: '0 0 420px', minWidth: 280, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: '0 0 calc(60% - 10px)', minWidth: 280, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Asset Allocation</div>
@@ -376,50 +376,28 @@ const WealthOverview = () => {
           {chartData.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d1d5db', fontSize: 13 }}>No assets recorded yet.</div>
           ) : (
-            <>
-              <div style={{ height: 180 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={v => formatCurrency(v)} tick={{ fontSize: 10, fill: '#9ca3af' }} width={52} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      formatter={value => [fmtFull(value), 'Value']}
-                      contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
-                      labelStyle={{ fontWeight: 700, color: '#111827' }}
-                      cursor={{ fill: 'rgba(13,148,136,0.06)' }}
-                    />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                      {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 12, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
-                {chartData.map((d, i) => (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: CHART_COLORS[i % CHART_COLORS.length], flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>{d.name}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#374151' }}>{formatCurrency(d.value, true)}</span>
-                  </div>
-                ))}
-              </div>
-
-              {top3Performers.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
-                  <Sparkles size={13} style={{ color: '#0d9488', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: '#374151' }}>
-                    Top performer: <strong>{top3Performers[0].name}</strong>
-                  </span>
-                </div>
-              )}
-            </>
+            <div style={{ flex: 1, minHeight: 240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={v => formatCurrency(v)} tick={{ fontSize: 10, fill: '#9ca3af' }} width={52} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={value => [fmtFull(value), 'Value']}
+                    contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
+                    labelStyle={{ fontWeight: 700, color: '#111827' }}
+                    cursor={{ fill: 'rgba(13,148,136,0.06)' }}
+                  />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
 
         {/* Assets List */}
-        <div style={{ flex: 1, minWidth: 280, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: '0 0 calc(40% - 10px)', minWidth: 240, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Assets</div>
@@ -434,7 +412,7 @@ const WealthOverview = () => {
               No assets found. Add assets via <strong>Update Data</strong>.
             </div>
           ) : (
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, maxHeight: 380 }}>
+            <div style={{ overflowY: 'auto', maxHeight: 230 }}>
               {assets.map((asset, i) => {
                 const latestSnap = asset.monthlySnapshots?.[asset.monthlySnapshots.length - 1];
                 const returnPct  = latestSnap?.returnPercentage ?? null;
