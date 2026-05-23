@@ -165,6 +165,7 @@ const WealthOverview = () => {
   const [isChartExpanded, setIsChartExpanded]       = useState(false);
   const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null);
   const [editingAsset, setEditingAsset]             = useState(null);
+  const [expandedGroups, setExpandedGroups]         = useState(new Set());
 
   const fetchData = useCallback(async (silent = false) => {
     try {
@@ -219,6 +220,20 @@ const WealthOverview = () => {
     if (!isNaN(idAsNum) && idAsNum > 1_000_000_000_000) return formatDate(new Date(idAsNum), 'short');
     return null;
   };
+
+  const groupedMap = assets.reduce((acc, a) => {
+    if (!acc[a.name]) acc[a.name] = { name: a.name, total: 0, items: [] };
+    acc[a.name].total += a.currentValue || 0;
+    acc[a.name].items.push(a);
+    return acc;
+  }, {});
+  const groups = Object.values(groupedMap).sort((a, b) => b.total - a.total);
+
+  const toggleGroup = (name) => setExpandedGroups(prev => {
+    const next = new Set(prev);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
 
   const top3Performers = assets.length > 0
     ? [...assets]
@@ -376,18 +391,24 @@ const WealthOverview = () => {
           {chartData.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d1d5db', fontSize: 13 }}>No assets recorded yet.</div>
           ) : (
-            <div style={{ flex: 1, minHeight: 240 }}>
+            <div style={{ flex: 1, minHeight: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={v => formatCurrency(v)} tick={{ fontSize: 10, fill: '#9ca3af' }} width={52} axisLine={false} tickLine={false} />
+                <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 76, left: 0, bottom: 4 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip
                     formatter={value => [fmtFull(value), 'Value']}
                     contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     labelStyle={{ fontWeight: 700, color: '#111827' }}
                     cursor={{ fill: 'rgba(13,148,136,0.06)' }}
                   />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}
+                    label={{ position: 'right', content: ({ x, y, width, height, value }) => (
+                      <text x={x + width + 6} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={700} fill="#374151">
+                        {fmtFull(value)}
+                      </text>
+                    )}}
+                  >
                     {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Bar>
                 </BarChart>
@@ -398,12 +419,9 @@ const WealthOverview = () => {
 
         {/* Assets List */}
         <div style={{ flex: '0 0 calc(40% - 10px)', minWidth: 240, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 20px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Assets</div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{assets.length} {assets.length === 1 ? 'item' : 'items'} · {selectedOwner === 'All' ? 'all owners' : selectedOwner}</div>
-            </div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#3d6b4f' }}>{fmtFull(totalNetWorth)}</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>Assets</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{assets.length} {assets.length === 1 ? 'item' : 'items'} · {selectedOwner === 'All' ? 'all owners' : selectedOwner}</div>
           </div>
 
           {assets.length === 0 ? (
@@ -412,86 +430,64 @@ const WealthOverview = () => {
               No assets found. Add assets via <strong>Update Data</strong>.
             </div>
           ) : (
-            <div style={{ overflowY: 'auto', maxHeight: 230 }}>
-              {assets.map((asset, i) => {
-                const latestSnap = asset.monthlySnapshots?.[asset.monthlySnapshots.length - 1];
-                const returnPct  = latestSnap?.returnPercentage ?? null;
-                const isPos      = returnPct !== null && returnPct >= 0;
-                const addedDate  = getAddedDate(asset);
-                const color      = CHART_COLORS[i % CHART_COLORS.length];
-                const isLast     = i === assets.length - 1;
-
+            <div style={{ overflowY: 'auto', maxHeight: 230, scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {groups.map((group, gi) => {
+                const color      = CHART_COLORS[gi % CHART_COLORS.length];
+                const isExpanded = expandedGroups.has(group.name);
+                const isLastGroup = gi === groups.length - 1;
                 return (
-                  <div
-                    key={asset._id}
-                    className="group"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '11px 0',
-                      borderBottom: isLast ? 'none' : '1px solid #f3f4f6',
-                      position: 'relative',
-                    }}
-                  >
-                    {/* Icon badge */}
-                    <div style={{
-                      width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                      background: color + '18',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 18,
-                    }}>
-                      {getAssetIcon(asset.name)}
-                    </div>
-
-                    {/* Name + detail */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {asset.name}
+                  <div key={group.name} style={{ borderBottom: isLastGroup && !isExpanded ? 'none' : '1px solid #f3f4f6' }}>
+                    {/* Group header */}
+                    <button
+                      onClick={() => toggleGroup(group.name)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <div style={{ width: 34, height: 34, borderRadius: 9, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                        {getAssetIcon(group.name)}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-                        <OwnerBadge owner={asset.owner} />
-                        {asset.accountDetails && (
-                          <span style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{asset.accountDetails}</span>
-                        )}
-                        {addedDate && <span style={{ fontSize: 10, color: '#d1d5db' }}>{addedDate}</span>}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{group.name}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>{group.items.length} account{group.items.length !== 1 ? 's' : ''}</div>
                       </div>
-                    </div>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: '#111827', flexShrink: 0 }}>{fmtFull(group.total)}</div>
+                      <span style={{ fontSize: 9, color: '#9ca3af', flexShrink: 0, marginLeft: 4 }}>{isExpanded ? '▲' : '▼'}</span>
+                    </button>
 
-                    {/* Value + return */}
-                    <div style={{ textAlign: 'right', flexShrink: 0, paddingRight: 8 }}>
-                      <div style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{fmtFull(asset.currentValue)}</div>
-                      {returnPct !== null && (
-                        <div style={{ fontSize: 11, fontWeight: 700, color: isPos ? '#16a34a' : '#dc2626', marginTop: 2 }}>
-                          {isPos ? '+' : ''}{formatPercentage(returnPct)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="opacity-0 group-hover:opacity-100" style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0, transition: 'opacity 0.15s' }}>
-                      <button
-                        onClick={() => setEditingAsset(asset)}
-                        title="Edit"
-                        style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}
-                      ><Pencil size={12} /></button>
-                      <button
-                        onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })}
-                        title="Delete"
-                        style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#ef4444', display: 'flex', alignItems: 'center' }}
-                      ><Trash2 size={12} /></button>
-                    </div>
+                    {/* Expanded individual accounts */}
+                    {isExpanded && (
+                      <div style={{ paddingBottom: 4 }}>
+                        {group.items.map((asset, ii) => {
+                          const addedDate  = getAddedDate(asset);
+                          const isLastItem = ii === group.items.length - 1;
+                          return (
+                            <div
+                              key={asset._id}
+                              className="group"
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 6px 44px', borderBottom: isLastItem ? 'none' : '1px solid #f9fafb', position: 'relative' }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <OwnerBadge owner={asset.owner} />
+                                {asset.accountDetails && (
+                                  <span style={{ fontSize: 11, color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{asset.accountDetails}</span>
+                                )}
+                                {addedDate && <span style={{ fontSize: 10, color: '#d1d5db' }}>{addedDate}</span>}
+                              </div>
+                              <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', flexShrink: 0 }}>{fmtFull(asset.currentValue)}</div>
+                              <div className="opacity-0 group-hover:opacity-100" style={{ display: 'flex', gap: 2, flexShrink: 0, transition: 'opacity 0.15s' }}>
+                                <button onClick={() => setEditingAsset(asset)} title="Edit" style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}><Pencil size={12} /></button>
+                                <button onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })} title="Delete" style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#ef4444', display: 'flex', alignItems: 'center' }}><Trash2 size={12} /></button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Footer total */}
-          {assets.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 4, borderTop: '2px solid #f3f4f6' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Total</span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: '#3d6b4f', letterSpacing: '-0.5px' }}>{fmtFull(totalNetWorth)}</span>
-            </div>
-          )}
         </div>
 
       </div>
@@ -532,38 +528,34 @@ const WealthOverview = () => {
               <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>Asset Allocation</div>
               <button onClick={() => setIsChartExpanded(false)} style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 7, padding: '5px 9px', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center' }}><X size={14} /></button>
             </div>
-            <div style={{ height: 300 }}>
+            <div style={{ height: 340 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={v => formatCurrency(v)} tick={{ fontSize: 12, fill: '#6b7280' }} width={60} axisLine={false} tickLine={false} />
+                <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 100, left: 0, bottom: 4 }}>
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={110} />
                   <Tooltip
                     formatter={value => [fmtFull(value), 'Value']}
                     contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     labelStyle={{ fontWeight: 700, color: '#111827' }}
                     cursor={{ fill: 'rgba(13,148,136,0.06)' }}
                   />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={22}
+                    label={{ position: 'right', content: ({ x, y, width, height, value }) => (
+                      <text x={x + width + 8} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={12} fontWeight={700} fill="#374151">
+                        {fmtFull(value)}
+                      </text>
+                    )}}
+                  >
                     {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
-              {chartData.map((d, i) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: CHART_COLORS[i % CHART_COLORS.length], flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>{d.name}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{fmtFull(d.value)}</span>
-                </div>
-              ))}
-            </div>
-            {topPerformer && (
+            {top3Performers.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 12, borderTop: '1px solid #f3f4f6' }}>
                 <Sparkles size={13} style={{ color: '#0d9488', flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: '#374151' }}>
-                  Top performer: <strong>{topPerformer.name}</strong>
-                  <span style={{ color: '#16a34a', fontWeight: 600 }}> · +{fmtFull(topPerformerGrowth)}</span>
+                  Top performer: <strong>{top3Performers[0].name}</strong>
                 </span>
               </div>
             )}
