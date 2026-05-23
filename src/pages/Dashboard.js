@@ -278,13 +278,19 @@ const DashboardScreen = () => {
             const anuragCC   = (expenseData.creditCards || []).filter(c => c.owner === 'anurag').reduce((s, c) => s + (c.spend || 0), 0);
             const nidhiCC    = (expenseData.creditCards || []).filter(c => c.owner === 'nidhi' ).reduce((s, c) => s + (c.spend || 0), 0);
 
-            const anuragSpend = (expDirect.anurag || 0) + anuragCC;
-            const nidhiSpend  = (expDirect.nidhi  || 0) + nidhiCC;
-            const totalSpend  = anuragSpend + nidhiSpend;
+            const anuragCat  = (expenseData.categories || []).filter(c => c.account === 'anurag').reduce((s, c) => s + (c.amount || 0), 0);
+            const nidhiCat   = (expenseData.categories || []).filter(c => c.account === 'nidhi' ).reduce((s, c) => s + (c.amount || 0), 0);
+            const jointCat   = (expenseData.categories || []).filter(c => (c.account || 'joint') === 'joint').reduce((s, c) => s + (c.amount || 0), 0);
+
+            const totalFixed = (expenseData.fixedExpenses || []).filter(fe => (fe.section ?? 'fixed') === 'fixed').reduce((s, f) => s + (f.amount || 0), 0);
+
+            const anuragSpend = (expDirect.anurag || 0) + anuragCC + anuragCat;
+            const nidhiSpend  = (expDirect.nidhi  || 0) + nidhiCC  + nidhiCat;
+            const totalSpend  = anuragSpend + nidhiSpend + (expDirect.joint || 0) + jointCat + totalFixed + (expenseData.sips || 0);
 
             const people = [
-              { label: 'Anurag', amount: anuragSpend, direct: expDirect.anurag || 0, cc: anuragCC, from: 'from-blue-500',   to: 'to-blue-700',   ring: 'ring-blue-300'   },
-              { label: 'Nidhi',  amount: nidhiSpend,  direct: expDirect.nidhi  || 0, cc: nidhiCC,  from: 'from-purple-500', to: 'to-purple-700', ring: 'ring-purple-300' },
+              { label: 'Anurag', amount: anuragSpend, direct: expDirect.anurag || 0, cc: anuragCC, cat: anuragCat, from: 'from-blue-500',   to: 'to-blue-700',   ring: 'ring-blue-300'   },
+              { label: 'Nidhi',  amount: nidhiSpend,  direct: expDirect.nidhi  || 0, cc: nidhiCC,  cat: nidhiCat,  from: 'from-purple-500', to: 'to-purple-700', ring: 'ring-purple-300' },
             ];
 
             return (
@@ -296,7 +302,7 @@ const DashboardScreen = () => {
                 </div>
 
                 {/* Per-person tiles */}
-                {people.map(({ label, amount, direct, cc, from, to, ring }) => {
+                {people.map(({ label, amount, direct, cc, cat, from, to, ring }) => {
                   const pct = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
                   return (
                     <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-2xl p-3.5 flex flex-col gap-1.5 flex-1`}>
@@ -313,7 +319,8 @@ const DashboardScreen = () => {
                       <div className="space-y-0.5">
                         {direct > 0 && <p className="text-[10px] text-white/65">UPI/cash {formatCurrency(direct, true)}</p>}
                         {cc     > 0 && <p className="text-[10px] text-white/65">CC {formatCurrency(cc, true)}</p>}
-                        {direct === 0 && cc === 0 && <p className="text-[10px] text-white/50 italic">No data yet</p>}
+                        {cat    > 0 && <p className="text-[10px] text-white/65">Categories {formatCurrency(cat, true)}</p>}
+                        {direct === 0 && cc === 0 && cat === 0 && <p className="text-[10px] text-white/50 italic">No data yet</p>}
                       </div>
                     </div>
                   );
