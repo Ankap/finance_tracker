@@ -16,7 +16,7 @@ function getMonthRange() {
 
 const MONTHS    = getMonthRange();
 const ASSET_TYPES = ['MF SIP', 'MF Zerodha', 'Stocks', 'EPF', 'PPF', 'Gold', 'Silver', 'Fixed Deposits', 'Bank Savings', 'House', 'Other'];
-const CHART_COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#84cc16'];
+const CHART_COLORS = ['#6366f1', '#f97316', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#06b6d4', '#84cc16'];
 
 const OWNER_META = {
   joint:  { color: '#3d6b4f', bg: '#f0faf4', border: '#b7e4c7', label: 'Joint'  },
@@ -171,6 +171,8 @@ function EditAssetModal({ asset, onSave, onClose }) {
 const WealthOverview = () => {
   const [assets, setAssets]                         = useState([]);
   const [totalNetWorth, setTotalNetWorth]           = useState(0);
+  const [principalNetWorth, setPrincipalNetWorth]   = useState(0);
+  const [nwView, setNwView]                         = useState('current');
   const [nwChange, setNwChange]                     = useState(0);
   const [nwChangePct, setNwChangePct]               = useState(0);
   const [loading, setLoading]                       = useState(true);
@@ -188,20 +190,20 @@ const WealthOverview = () => {
       const selectedIdx    = MONTHS.indexOf(selectedMonth);
       const prevMonthLabel = selectedIdx >= 0 && selectedIdx + 1 < MONTHS.length ? MONTHS[selectedIdx + 1] : null;
 
-      const [assetsRes, allForMonthRes, prevNWRes] = await Promise.all([
+      const [assetsRes, prevNWRes] = await Promise.all([
         assetsAPI.getAll(ownerFilter, selectedMonth),
-        ownerFilter ? assetsAPI.getAll(null, selectedMonth) : null,
-        prevMonthLabel ? assetsAPI.getNetWorth(null, prevMonthLabel) : Promise.resolve({ data: null }),
+        prevMonthLabel ? assetsAPI.getNetWorth(ownerFilter, prevMonthLabel) : Promise.resolve({ data: null }),
       ]);
 
-      const allForMonth = ownerFilter ? allForMonthRes.data : assetsRes.data;
-      const currentNW   = allForMonth.reduce((sum, a) => sum + (a.currentValue || 0), 0);
+      const currentNW   = assetsRes.data.reduce((sum, a) => sum + (a.currentValue    || 0), 0);
+      const principalNW = assetsRes.data.reduce((sum, a) => sum + (a.principalAmount || 0), 0);
       const prevNW      = prevNWRes?.data?.totalNetWorth || 0;
       const change      = prevNW > 0 ? currentNW - prevNW : 0;
       const changePct   = prevNW > 0 ? (change / prevNW) * 100 : 0;
 
       setAssets(assetsRes.data);
       setTotalNetWorth(currentNW);
+      setPrincipalNetWorth(principalNW);
       setNwChange(change);
       setNwChangePct(changePct);
     } catch (error) {
@@ -260,6 +262,20 @@ const WealthOverview = () => {
         .sort((a, b) => b.gain - a.gain)
         .slice(0, 3)
         .map(x => x.asset)
+    : [];
+
+  const bottom3Losers = assets.length > 0
+    ? Object.values(
+        assets.reduce((acc, a) => {
+          if (!acc[a.name]) acc[a.name] = { name: a.name, principal: 0, current: 0 };
+          acc[a.name].principal += a.principalAmount || 0;
+          acc[a.name].current  += a.currentValue    || 0;
+          return acc;
+        }, {})
+      )
+      .filter(g => g.principal > 0 && g.current < g.principal)
+      .sort((a, b) => (a.current - a.principal) / a.principal - (b.current - b.principal) / b.principal)
+      .slice(0, 3)
     : [];
 
   const handleEdit = async ({ currentValue, principalAmount, ...metaPatch }) => {
@@ -339,10 +355,36 @@ const WealthOverview = () => {
       <div style={{ background: 'linear-gradient(135deg, #f0faf4 0%, #fff 70%)', border: '1px solid #b7e4c7', borderRadius: 14, padding: '18px 24px', display: 'flex', gap: 0, flexWrap: 'wrap' }}>
 
         {/* Net Worth */}
-        <div style={{ flex: '1 1 180px', paddingRight: 24 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#52966e', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Total Net Worth</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#2d6a4f', letterSpacing: '-1px', lineHeight: 1 }}>{fmtFull(totalNetWorth)}</div>
-          <div style={{ fontSize: 12, color: '#74b08a', marginTop: 5 }}>{assets.length} asset{assets.length !== 1 ? 's' : ''} · {chartData.length} categor{chartData.length !== 1 ? 'ies' : 'y'}</div>
+        <div style={{ flex: '1 1 200px', paddingRight: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#52966e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Total Net Worth</div>
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.6)', border: '1px solid #b7e4c7', borderRadius: 20, padding: 2, gap: 2 }}>
+              {[['current', 'Current'], ['principal', 'Principal']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setNwView(val)}
+                  style={{
+                    padding: '2px 10px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none',
+                    background: nwView === val ? '#2d6a4f' : 'transparent',
+                    color:      nwView === val ? '#fff'    : '#52966e',
+                    transition: 'all 0.15s',
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#2d6a4f', letterSpacing: '-1px', lineHeight: 1 }}>
+            {fmtFull(nwView === 'current' ? totalNetWorth : principalNetWorth)}
+          </div>
+          {nwView === 'current' && principalNetWorth > 0 && (() => {
+            const gain = totalNetWorth - principalNetWorth;
+            return (
+              <div style={{ fontSize: 11, color: gain >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                {gain >= 0 ? '▲ +' : '▼ '}{fmtFull(Math.abs(gain))} gain
+              </div>
+            );
+          })()}
+          <div style={{ fontSize: 12, color: '#74b08a', marginTop: 4 }}>{assets.length} asset{assets.length !== 1 ? 's' : ''} · {chartData.length} categor{chartData.length !== 1 ? 'ies' : 'y'}</div>
         </div>
 
         {/* Divider */}
@@ -382,6 +424,29 @@ const WealthOverview = () => {
                   <div key={a._id} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.7)', border: '1px solid #b7e4c7', borderRadius: 20, padding: '4px 10px 4px 7px' }}>
                     <span style={{ fontSize: 14, lineHeight: 1 }}>{medals[i]}</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#2d6a4f' }}>{a.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Divider */}
+        {bottom3Losers.length > 0 && <div style={{ width: 1, background: '#b7e4c7', alignSelf: 'stretch', margin: '0 24px 0 0', flexShrink: 0 }} />}
+
+        {/* In Loss */}
+        {bottom3Losers.length > 0 && (
+          <div style={{ flex: '1 1 160px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>In Loss</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {bottom3Losers.map(g => {
+                const loss    = g.current - g.principal;
+                const lossPct = ((loss / g.principal) * 100).toFixed(1);
+                return (
+                  <div key={g.name} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(254,242,242,0.8)', border: '1px solid #fecaca', borderRadius: 20, padding: '4px 10px 4px 9px' }}>
+                    <span style={{ fontSize: 11, lineHeight: 1 }}>📉</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', flex: 1 }}>{g.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', whiteSpace: 'nowrap' }}>{lossPct}%</span>
                   </div>
                 );
               })}
