@@ -38,10 +38,15 @@ async function getAllAssetsAggregated() {
   return Object.values(assetMap);
 }
 
-// Carry-forward: return assets for a month by aggregating all entries up to and
-// including that month. Later months overwrite earlier ones so each asset appears
-// once with its most-recently-known values.
+// Strict: return only assets explicitly stored for the given month.
 async function getAssetsForMonth(monthKey) {
+  const data = await kv.get(`assets:${monthKey}`);
+  return data?.assets ?? [];
+}
+
+// Carry-forward: aggregate all entries up to and including monthKey.
+// Used only for networth snapshot so it reflects all known asset values.
+async function getAssetsCarryForward(monthKey) {
   const allKeys = await getSortedKeys();
   const targetKey = `assets:${monthKey}`;
   const priorKeys = allKeys.filter(k => k <= targetKey);
@@ -59,7 +64,7 @@ async function getAssetsForMonth(monthKey) {
 }
 
 async function saveNetworthSnapshot(monthKey) {
-  const assets = await getAssetsForMonth(monthKey);
+  const assets = await getAssetsCarryForward(monthKey);
   const totalNetWorth = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
   const breakdown = {};
   for (const asset of assets) {

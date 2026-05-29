@@ -16,7 +16,7 @@ function getMonthRange() {
 
 const MONTHS    = getMonthRange();
 const ASSET_TYPES = ['MF SIP', 'MF Zerodha', 'Stocks', 'EPF', 'PPF', 'Gold', 'Silver', 'Fixed Deposits', 'Bank Savings', 'House', 'Other'];
-const CHART_COLORS = ['#0d9488', '#059669', '#16a34a', '#0f766e', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#d97706', '#65a30d'];
+const CHART_COLORS = ['#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#84cc16'];
 
 const OWNER_META = {
   joint:  { color: '#3d6b4f', bg: '#f0faf4', border: '#b7e4c7', label: 'Joint'  },
@@ -223,8 +223,14 @@ const WealthOverview = () => {
 
   const chartData = assets.length > 0
     ? Object.entries(
-        assets.reduce((acc, a) => { acc[a.name] = (acc[a.name] || 0) + a.currentValue; return acc; }, {})
-      ).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }))
+        assets.reduce((acc, a) => {
+          if (!acc[a.name]) acc[a.name] = { principal: 0, current: 0 };
+          acc[a.name].principal += a.principalAmount || 0;
+          acc[a.name].current  += a.currentValue    || 0;
+          return acc;
+        }, {})
+      ).sort((a, b) => b[1].current - a[1].current)
+       .map(([name, vals]) => ({ name, principal: vals.principal, current: vals.current }))
     : [];
 
   const getAddedDate = (asset) => {
@@ -403,21 +409,39 @@ const WealthOverview = () => {
             </button>
           </div>
 
+          {/* Legend */}
+          <div style={{ display: 'flex', gap: 14, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#cbd5e1' }} />
+              <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>Principal</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#0d9488' }} />
+              <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>Current Value</span>
+            </div>
+          </div>
           {chartData.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d1d5db', fontSize: 13 }}>No assets recorded yet.</div>
           ) : (
             <div style={{ flex: 1, minHeight: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 76, left: 0, bottom: 4 }}>
+                <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 80, left: 0, bottom: 4 }}>
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} width={100} />
                   <Tooltip
-                    formatter={value => [fmtFull(value), 'Value']}
+                    formatter={(value, name) => [fmtFull(value), name === 'current' ? 'Current Value' : 'Principal']}
                     contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     labelStyle={{ fontWeight: 700, color: '#111827' }}
                     cursor={{ fill: 'rgba(13,148,136,0.06)' }}
                   />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={18}
+                  <Bar dataKey="principal" name="Principal" barSize={9} radius={[0, 4, 4, 0]} fill="#cbd5e1"
+                    label={{ position: 'right', content: ({ x, y, width, height, value }) => (
+                      <text x={x + width + 6} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={10} fontWeight={600} fill="#94a3b8">
+                        {fmtFull(value)}
+                      </text>
+                    )}}
+                  />
+                  <Bar dataKey="current" name="Current Value" barSize={9} radius={[0, 6, 6, 0]}
                     label={{ position: 'right', content: ({ x, y, width, height, value }) => (
                       <text x={x + width + 6} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={700} fill="#374151">
                         {fmtFull(value)}
@@ -553,18 +577,36 @@ const WealthOverview = () => {
               <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>Asset Allocation</div>
               <button onClick={() => setIsChartExpanded(false)} style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 7, padding: '5px 9px', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center' }}><X size={14} /></button>
             </div>
+            {/* Expanded legend */}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: '#cbd5e1' }} />
+                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Principal</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: '#0d9488' }} />
+                <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Current Value</span>
+              </div>
+            </div>
             <div style={{ height: 340 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 100, left: 0, bottom: 4 }}>
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={110} />
                   <Tooltip
-                    formatter={value => [fmtFull(value), 'Value']}
+                    formatter={(value, name) => [fmtFull(value), name === 'current' ? 'Current Value' : 'Principal']}
                     contentStyle={{ fontSize: 12, borderRadius: 9, border: '1px solid #e5e7eb', boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
                     labelStyle={{ fontWeight: 700, color: '#111827' }}
                     cursor={{ fill: 'rgba(13,148,136,0.06)' }}
                   />
-                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={22}
+                  <Bar dataKey="principal" name="Principal" barSize={12} radius={[0, 4, 4, 0]} fill="#cbd5e1"
+                    label={{ position: 'right', content: ({ x, y, width, height, value }) => (
+                      <text x={x + width + 8} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={11} fontWeight={600} fill="#94a3b8">
+                        {fmtFull(value)}
+                      </text>
+                    )}}
+                  />
+                  <Bar dataKey="current" name="Current Value" barSize={12} radius={[0, 6, 6, 0]}
                     label={{ position: 'right', content: ({ x, y, width, height, value }) => (
                       <text x={x + width + 8} y={y + height / 2 + 1} dominantBaseline="middle" fontSize={12} fontWeight={700} fill="#374151">
                         {fmtFull(value)}
