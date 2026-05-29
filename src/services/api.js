@@ -1,73 +1,6 @@
 // Static data - no API connections
 
-const staticAssets = [
-  {
-    _id: '1',
-    name: 'Mutual Funds',
-    currentValue: 425000,
-    owner: 'Joint',
-    accountDetails: 'SBI MF + HDFC MF',
-    monthlySnapshots: [
-      { value: 400000, returnPercentage: 6.2 },
-      { value: 425000, returnPercentage: 6.25 },
-    ],
-  },
-  {
-    _id: '2',
-    name: 'Stocks',
-    currentValue: 310000,
-    owner: 'Anurag',
-    accountDetails: 'Zerodha',
-    monthlySnapshots: [
-      { value: 290000, returnPercentage: 8.1 },
-      { value: 310000, returnPercentage: 6.9 },
-    ],
-  },
-  {
-    _id: '3',
-    name: 'EPF',
-    currentValue: 285000,
-    owner: 'Anurag',
-    accountDetails: 'EPFO',
-    monthlySnapshots: [
-      { value: 275000, returnPercentage: 8.25 },
-      { value: 285000, returnPercentage: 3.6 },
-    ],
-  },
-  {
-    _id: '4',
-    name: 'Gold',
-    currentValue: 180000,
-    owner: 'Joint',
-    accountDetails: 'SGB + Physical',
-    monthlySnapshots: [
-      { value: 170000, returnPercentage: 12.5 },
-      { value: 180000, returnPercentage: 5.9 },
-    ],
-  },
-  {
-    _id: '5',
-    name: 'Fixed Deposits',
-    currentValue: 350000,
-    owner: 'Nidhi',
-    accountDetails: 'SBI FD',
-    monthlySnapshots: [
-      { value: 340000, returnPercentage: 7.1 },
-      { value: 350000, returnPercentage: 2.9 },
-    ],
-  },
-  {
-    _id: '6',
-    name: 'Bank Savings',
-    currentValue: 125000,
-    owner: 'Joint',
-    accountDetails: 'HDFC Savings',
-    monthlySnapshots: [
-      { value: 110000, returnPercentage: 3.5 },
-      { value: 125000, returnPercentage: 3.5 },
-    ],
-  },
-];
+const staticAssets = [];
 
 const staticGoals = [
   {
@@ -231,26 +164,23 @@ export const assetsAPI = {
     const assets = await fetchAssetsFromFile(owner, month);
     return { data: assets };
   },
-  getById: (id) => Promise.resolve({ data: staticAssets.find(a => a._id === id) }),
+  getById: () => Promise.resolve({ data: null }),
+  // assetData: { name, owner, accountDetails, principalAmount, currentValue }
   create: (assetData) => postToAssetsAPI({ action: 'create', ...assetData }),
   update: (assetId, patch) => postToAssetsAPI({ action: 'update', assetId, ...patch }),
   delete: (id) => postToAssetsAPI({ action: 'delete', assetId: id }),
+  // snapshot: { value, principalAmount, month? }  (month = "Month YYYY" or "YYYY_MM")
   addSnapshot: (assetId, snapshot) =>
     postToAssetsAPI({ action: 'addSnapshot', assetId, ...snapshot }),
-  resetMonth: (month) => postToAssetsAPI({ action: 'reset', month }),
   getNetWorth: async (owner = null, month = null) => {
     try {
       const assets = await fetchAssetsFromFile(owner, month);
-      const totalNetWorth = assets.reduce((sum, a) => sum + a.currentValue, 0);
+      const totalNetWorth = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
       const breakdown = {};
-      assets.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + a.currentValue; });
+      assets.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + (a.currentValue || 0); });
       return { data: { totalNetWorth, breakdown } };
     } catch {
-      const filtered = owner ? staticAssets.filter(a => a.owner === owner) : staticAssets;
-      const totalNetWorth = filtered.reduce((sum, a) => sum + a.currentValue, 0);
-      const breakdown = {};
-      filtered.forEach(a => { breakdown[a.name] = (breakdown[a.name] || 0) + a.currentValue; });
-      return { data: { totalNetWorth, breakdown } };
+      return { data: { totalNetWorth: 0, breakdown: {} } };
     }
   },
 };

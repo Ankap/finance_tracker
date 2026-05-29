@@ -48,15 +48,16 @@ function OwnerBadge({ owner }) {
 }
 
 function EditAssetModal({ asset, onSave, onClose }) {
-  const [name, setName]              = useState(asset.name);
-  const [owner, setOwner]            = useState(asset.owner || 'Joint');
-  const [accountDetails, setDetails] = useState(asset.accountDetails || '');
-  const [currentValue, setValue]     = useState(asset.currentValue ?? '');
-  const [saving, setSaving]          = useState(false);
+  const [name, setName]                  = useState(asset.name);
+  const [owner, setOwner]                = useState(asset.owner || 'Joint');
+  const [accountDetails, setDetails]     = useState(asset.accountDetails || '');
+  const [currentValue, setValue]         = useState(asset.currentValue ?? '');
+  const [principalAmount, setPrincipal]  = useState(asset.principalAmount ?? '');
+  const [saving, setSaving]              = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ name, owner, accountDetails, currentValue: Number(currentValue) });
+    await onSave({ name, owner, accountDetails, currentValue: Number(currentValue), principalAmount: Number(principalAmount) || 0 });
     setSaving(false);
   };
 
@@ -126,6 +127,19 @@ function EditAssetModal({ asset, onSave, onClose }) {
               value={accountDetails}
               onChange={e => setDetails(e.target.value)}
               style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #e5e7eb', fontSize: 14, outline: 'none', boxSizing: 'border-box', color: '#111827' }}
+            />
+          </div>
+
+          {/* Principal amount */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Principal Amount (₹)</div>
+            <input
+              type="number"
+              min="0"
+              placeholder="e.g. 400000"
+              value={principalAmount}
+              onChange={e => setPrincipal(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 700, outline: 'none', boxSizing: 'border-box', color: '#111827' }}
             />
           </div>
 
@@ -214,8 +228,6 @@ const WealthOverview = () => {
     : [];
 
   const getAddedDate = (asset) => {
-    const firstSnapDate = asset.monthlySnapshots?.[0]?.date;
-    if (firstSnapDate) return formatDate(firstSnapDate, 'short');
     const idAsNum = Number(asset._id);
     if (!isNaN(idAsNum) && idAsNum > 1_000_000_000_000) return formatDate(new Date(idAsNum), 'short');
     return null;
@@ -237,19 +249,22 @@ const WealthOverview = () => {
 
   const top3Performers = assets.length > 0
     ? [...assets]
-        .map(a => ({ asset: a, ret: a.monthlySnapshots?.length ? a.monthlySnapshots[a.monthlySnapshots.length - 1].returnPercentage : -Infinity }))
-        .sort((a, b) => b.ret - a.ret)
+        .filter(a => a.principalAmount > 0)
+        .map(a => ({ asset: a, gain: ((a.currentValue - a.principalAmount) / a.principalAmount) * 100 }))
+        .sort((a, b) => b.gain - a.gain)
         .slice(0, 3)
         .map(x => x.asset)
     : [];
 
-  const handleEdit = async ({ currentValue, ...metaPatch }) => {
+  const handleEdit = async ({ currentValue, principalAmount, ...metaPatch }) => {
     const { _id, currentValue: oldValue } = editingAsset;
     setEditingAsset(null);
-    setAssets(prev => prev.map(a => a._id === _id ? { ...a, ...metaPatch, currentValue } : a));
+    setAssets(prev => prev.map(a => a._id === _id ? { ...a, ...metaPatch, currentValue, principalAmount } : a));
     setTotalNetWorth(prev => prev + (currentValue - oldValue));
     const calls = [assetsAPI.update(_id, metaPatch)];
-    if (currentValue !== oldValue) calls.push(assetsAPI.addSnapshot(_id, { value: currentValue }));
+    if (currentValue !== oldValue || principalAmount !== undefined) {
+      calls.push(assetsAPI.addSnapshot(_id, { value: currentValue, principalAmount }));
+    }
     await Promise.all(calls);
     fetchData(true);
   };
@@ -472,7 +487,17 @@ const WealthOverview = () => {
                                 )}
                                 {addedDate && <span style={{ fontSize: 10, color: '#d1d5db' }}>{addedDate}</span>}
                               </div>
-                              <div style={{ fontWeight: 700, fontSize: 12, color: '#374151', flexShrink: 0 }}>{fmtFull(asset.currentValue)}</div>
+                              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, color: '#374151' }}>{fmtFull(asset.currentValue)}</div>
+                                {asset.principalAmount > 0 && (() => {
+                                  const gain = asset.currentValue - asset.principalAmount;
+                                  return (
+                                    <div style={{ fontSize: 10, color: gain >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                                      {gain >= 0 ? '+' : ''}{fmtFull(gain)}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                               <div className="opacity-0 group-hover:opacity-100" style={{ display: 'flex', gap: 2, flexShrink: 0, transition: 'opacity 0.15s' }}>
                                 <button onClick={() => setEditingAsset(asset)} title="Edit" style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}><Pencil size={12} /></button>
                                 <button onClick={() => setConfirmDeleteAsset({ _id: asset._id, name: asset.name })} title="Delete" style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', padding: '4px 6px', color: '#ef4444', display: 'flex', alignItems: 'center' }}><Trash2 size={12} /></button>

@@ -3,7 +3,10 @@ import { kv } from '@vercel/kv';
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function parseMonthParam(monthStr) {
-  const parts = monthStr.trim().split(' ');
+  if (!monthStr) return null;
+  const s = monthStr.trim();
+  if (/^\d{4}_\d{2}$/.test(s)) return s;
+  const parts = s.split(' ');
   if (parts.length !== 2) return null;
   const [monthName, year] = parts;
   const idx = MONTH_NAMES.indexOf(monthName);
@@ -13,17 +16,7 @@ function parseMonthParam(monthStr) {
 
 function getCurrentMonthKey() {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}_${month}`;
-}
-
-function getPreviousMonthKey() {
-  const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  return `${year}_${month}`;
+  return `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 async function getSortedKeys() {
@@ -31,17 +24,12 @@ async function getSortedKeys() {
   return keys.sort();
 }
 
-async function readMonthData(monthKey) {
-  return await kv.get(`assets:${monthKey}`);
-}
-
-// Aggregate assets across ALL monthly KV entries — later months overwrite earlier ones.
 async function getAllAssetsAggregated() {
   const keys = await getSortedKeys();
   const assetMap = {};
   for (const key of keys) {
     const data = await kv.get(key);
-    if (data && data.assets) {
+    if (data?.assets) {
       for (const asset of data.assets) {
         assetMap[asset._id] = asset;
       }
@@ -50,18 +38,14 @@ async function getAllAssetsAggregated() {
   return Object.values(assetMap);
 }
 
-// Return assets for a specific month by aggregating all entries up to and including
-// that month. Later months overwrite earlier ones so each asset appears once with
-// its most-recent-known value. This ensures assets added in prior months are always
-// included (carry-forward), and a month that only updated some assets still shows
-// all previously-added assets with their last recorded values.
+// Carry-forward: return assets for a month by aggregating all entries up to and
+// including that month. Later months overwrite earlier ones so each asset appears
+// once with its most-recently-known values.
 async function getAssetsForMonth(monthKey) {
   const allKeys = await getSortedKeys();
   const targetKey = `assets:${monthKey}`;
   const priorKeys = allKeys.filter(k => k <= targetKey);
-
   if (priorKeys.length === 0) return [];
-
   const assetMap = {};
   for (const key of priorKeys) {
     const d = await kv.get(key);
@@ -74,7 +58,6 @@ async function getAssetsForMonth(monthKey) {
   return Object.values(assetMap);
 }
 
-// Compute and persist a networth snapshot for the given month to networth:YYYY_MM.
 async function saveNetworthSnapshot(monthKey) {
   const assets = await getAssetsForMonth(monthKey);
   const totalNetWorth = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
@@ -84,33 +67,25 @@ async function saveNetworthSnapshot(monthKey) {
   }
   const [year, mo] = monthKey.split('_').map(Number);
   await kv.set(`networth:${monthKey}`, {
-    year,
-    month: mo,
+    year, month: mo,
     date: `${year}-${String(mo).padStart(2, '0')}`,
-    monthKey,
-    totalNetWorth,
-    breakdown,
+    monthKey, totalNetWorth, breakdown,
     lastUpdated: new Date().toISOString(),
   });
 }
 
-// Get or create the current month's KV entry.
-async function getOrCreateCurrentMonthData() {
-  const monthKey = getCurrentMonthKey();
+async function getOrCreateMonthData(monthKey) {
   let data = await kv.get(`assets:${monthKey}`);
-
   if (!data) {
-    const now = new Date();
+    const [year, month] = monthKey.split('_').map(Number);
     data = {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-      lastUpdated: now.toISOString(),
+      year, month,
+      date: `${year}-${String(month).padStart(2, '0')}`,
+      lastUpdated: new Date().toISOString(),
       assets: [],
     };
     await kv.set(`assets:${monthKey}`, data);
   }
-
   return data;
 }
 
@@ -129,32 +104,18 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { action, assetId, value, returnPercentage, name, currentValue, owner } = req.body;
-
-      const monthKey = getCurrentMonthKey();
-      const fileData = await getOrCreateCurrentMonthData();
+      const { action } = req.body;
 
       if (action === 'addSnapshot') {
-        // Calculate returnPercentage by comparing to the previous month's value.
-        const prevMonthData = await readMonthData(getPreviousMonthKey());
-        let calcReturn = returnPercentage || 0;
-        if (prevMonthData) {
-          const prevAsset = prevMonthData.assets.find(a => a._id === assetId);
-          if (prevAsset && prevAsset.currentValue > 0) {
-            calcReturn = parseFloat(((value - prevAsset.currentValue) / prevAsset.currentValue * 100).toFixed(2));
-          }
-        }
+        const { assetId, value, principalAmount, month } = req.body;
+        const monthKey = parseMonthParam(month) || getCurrentMonthKey();
+        const fileData = await getOrCreateMonthData(monthKey);
 
         const idx = fileData.assets.findIndex(a => a._id === assetId);
         if (idx >= 0) {
-          // Asset already in current month entry — update it.
           fileData.assets[idx].currentValue = value;
-          fileData.assets[idx].monthlySnapshots = [
-            ...(fileData.assets[idx].monthlySnapshots || []),
-            { value, returnPercentage: calcReturn, date: new Date().toISOString() },
-          ];
+          if (principalAmount !== undefined) fileData.assets[idx].principalAmount = principalAmount;
         } else {
-          // Asset not in current month yet — pull metadata from the aggregated history.
           const allAssets = await getAllAssetsAggregated();
           const existing = allAssets.find(a => a._id === assetId);
           if (existing) {
@@ -163,45 +124,61 @@ export default async function handler(req, res) {
               name: existing.name,
               owner: existing.owner,
               accountDetails: existing.accountDetails || '',
+              principalAmount: principalAmount ?? existing.principalAmount ?? 0,
               currentValue: value,
-              monthlySnapshots: [{ value, returnPercentage: calcReturn, date: new Date().toISOString() }],
             });
           }
         }
-      } else if (action === 'create') {
+
+        fileData.lastUpdated = new Date().toISOString();
+        await kv.set(`assets:${monthKey}`, fileData);
+        await saveNetworthSnapshot(monthKey);
+        return res.status(200).json({ data: { success: true } });
+      }
+
+      if (action === 'create') {
+        const { name, currentValue, owner, accountDetails, principalAmount } = req.body;
+        const monthKey = getCurrentMonthKey();
+        const fileData = await getOrCreateMonthData(monthKey);
         const newId = String(Date.now());
         fileData.assets.push({
           _id: newId,
           name,
-          currentValue,
           owner,
-          accountDetails: '',
-          monthlySnapshots: [{ value: currentValue, returnPercentage: 0, date: new Date().toISOString() }],
+          accountDetails: accountDetails || '',
+          principalAmount: principalAmount ?? 0,
+          currentValue,
         });
-      } else if (action === 'update') {
-        // Update metadata (name, owner, accountDetails) across ALL monthly entries so history stays consistent.
-        const { assetId: updateId, name: newName, owner: newOwner, accountDetails: newDetails } = req.body;
+        fileData.lastUpdated = new Date().toISOString();
+        await kv.set(`assets:${monthKey}`, fileData);
+        await saveNetworthSnapshot(monthKey);
+        return res.status(200).json({ data: { success: true } });
+      }
+
+      if (action === 'update') {
+        const { assetId, name, owner, accountDetails } = req.body;
         const allKeys = await getSortedKeys();
         for (const key of allKeys) {
           const monthData = await kv.get(key);
           if (monthData?.assets) {
-            const idx = monthData.assets.findIndex(a => a._id === updateId);
+            const idx = monthData.assets.findIndex(a => a._id === assetId);
             if (idx >= 0) {
-              if (newName !== undefined)    monthData.assets[idx].name           = newName;
-              if (newOwner !== undefined)   monthData.assets[idx].owner          = newOwner;
-              if (newDetails !== undefined) monthData.assets[idx].accountDetails = newDetails;
+              if (name !== undefined)           monthData.assets[idx].name           = name;
+              if (owner !== undefined)          monthData.assets[idx].owner          = owner;
+              if (accountDetails !== undefined) monthData.assets[idx].accountDetails = accountDetails;
               await kv.set(key, { ...monthData, lastUpdated: new Date().toISOString() });
             }
           }
         }
         return res.status(200).json({ data: { success: true } });
-      } else if (action === 'delete') {
+      }
+
+      if (action === 'delete') {
         const { assetId } = req.body;
-        // Remove the asset from every monthly KV entry
         const allKeys = await getSortedKeys();
         for (const key of allKeys) {
           const monthData = await kv.get(key);
-          if (monthData && monthData.assets) {
+          if (monthData?.assets) {
             const filtered = monthData.assets.filter(a => a._id !== assetId);
             if (filtered.length !== monthData.assets.length) {
               await kv.set(key, { ...monthData, assets: filtered, lastUpdated: new Date().toISOString() });
@@ -211,13 +188,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ data: { success: true } });
       }
 
-      fileData.lastUpdated = new Date().toISOString();
-      await kv.set(`assets:${monthKey}`, fileData);
-
-      // Persist a dedicated networth snapshot so the agent can query it by month.
-      await saveNetworthSnapshot(monthKey);
-
-      return res.status(200).json({ data: { success: true } });
+      return res.status(400).json({ error: 'Unknown action' });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

@@ -364,8 +364,12 @@ const UpdateData = () => {
   const [assetForm, setAssetForm] = useState({
     name: 'MF SIP',
     currentValue: '',
-    returnPercentage: '',
+    principalAmount: '',
     owner: 'Joint',
+    month: (() => {
+      const now = new Date();
+      return `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, '0')}`;
+    })(),
   });
 
   // Statement upload state
@@ -443,19 +447,21 @@ const UpdateData = () => {
       );
       if (existingAsset) {
         await assetsAPI.addSnapshot(existingAsset._id, {
-          value:            parseFloat(assetForm.currentValue),
-          returnPercentage: parseFloat(assetForm.returnPercentage),
+          value:           parseFloat(assetForm.currentValue),
+          principalAmount: parseFloat(assetForm.principalAmount) || 0,
+          month:           assetForm.month,
         });
       } else {
         await assetsAPI.create({
-          name:         assetForm.name,
-          currentValue: parseFloat(assetForm.currentValue),
-          owner:        assetForm.owner,
+          name:            assetForm.name,
+          currentValue:    parseFloat(assetForm.currentValue),
+          principalAmount: parseFloat(assetForm.principalAmount) || 0,
+          owner:           assetForm.owner,
         });
       }
       localStorage.setItem('ai_insights_stale', 'true');
       setSuccess(true);
-      setAssetForm({ name: 'MF SIP', currentValue: '', returnPercentage: '', owner: 'Joint' });
+      setAssetForm(f => ({ ...f, currentValue: '', principalAmount: '' }));
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Error updating asset:', error);
@@ -741,35 +747,50 @@ const UpdateData = () => {
             </div>
           </div>
 
-          {/* Values card */}
+          {/* Month + Values card */}
           <div style={card}>
+            {/* Month selector */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={label}>Month</span>
+              <select
+                value={assetForm.month}
+                onChange={e => setAssetForm(f => ({ ...f, month: e.target.value }))}
+                style={{ ...input, cursor: 'pointer', appearance: 'none', maxWidth: 240 }}
+              >
+                {nwMonths.map(m => (
+                  <option key={m.key} value={m.key}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
             <div style={{ display: 'flex', gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <span style={label}>Principal Amount</span>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14, fontWeight: 600, pointerEvents: 'none' }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={assetForm.principalAmount}
+                    onChange={e => setAssetForm(f => ({ ...f, principalAmount: e.target.value }))}
+                    style={{ ...input, paddingLeft: 28 }}
+                    placeholder="4,00,000"
+                  />
+                </div>
+              </div>
               <div style={{ flex: 1 }}>
                 <span style={label}>Current Value</span>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14, fontWeight: 600, pointerEvents: 'none' }}>₹</span>
                   <input
                     type="number"
+                    min="0"
                     value={assetForm.currentValue}
-                    onChange={e => setAssetForm({ ...assetForm, currentValue: e.target.value })}
+                    onChange={e => setAssetForm(f => ({ ...f, currentValue: e.target.value }))}
                     style={{ ...input, paddingLeft: 28 }}
                     placeholder="4,25,000"
                     required
                   />
-                </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <span style={label}>Return % <span style={{ textTransform: 'none', fontWeight: 400, color: '#d1d5db' }}>(auto-calc if blank)</span></span>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={assetForm.returnPercentage}
-                    onChange={e => setAssetForm({ ...assetForm, returnPercentage: e.target.value })}
-                    style={{ ...input, paddingRight: 32 }}
-                    placeholder="12.5"
-                  />
-                  <span style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 13, pointerEvents: 'none' }}>%</span>
                 </div>
               </div>
             </div>
