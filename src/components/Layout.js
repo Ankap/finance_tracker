@@ -41,7 +41,7 @@ const Layout = ({ children }) => {
   const [chatOpen, setChatOpen] = useState(false);
 
   const navItems = [
-    { path: '/', label: 'Overview', icon: Home },
+    { path: '/', label: 'Dashboard', icon: Home },
     { path: '/wealth', label: 'Wealth', icon: TrendingUp },
     { path: '/goals', label: 'Goals', icon: Target },
     { path: '/expenses', label: 'Expenses', icon: IndianRupee },

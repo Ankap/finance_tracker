@@ -1,42 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { assetsAPI, goalsAPI, transactionsAPI } from '../services/api';
+import { Link } from 'react-router-dom';
+import { assetsAPI, transactionsAPI } from '../services/api';
 import { getExpensesData } from '../lib/expenses.data';
 import { formatFullCurrency, formatCurrency } from '../utils/formatters';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart } from 'recharts';
+import { Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart, Bar, BarChart, ComposedChart, Legend, LabelList } from 'recharts';
 
 // --- Component ---
 
 const DashboardScreen = () => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [snapshotData, setSnapshotData] = useState(null);
   const [netWorthData, setNetWorthData] = useState(null);
-  const [goals, setGoals] = useState([]);
-  const [expenseData, setExpenseData] = useState(null);
   const [trendHistory, setTrendHistory] = useState([]);
+  const [ccHistory, setCcHistory] = useState([]);
+  const [ccCards, setCcCards] = useState([]);
+  const [totalExpenseHistory, setTotalExpenseHistory] = useState([]);
+  const [savingsHistory, setSavingsHistory] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const now = new Date();
-        const currentMonthLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
         // Last 6 months oldest→newest (same format WealthOverview uses for its month selector)
         const last6MonthDates = Array.from({ length: 6 }, (_, i) =>
           new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
         );
 
-        const [netWorthRes, allGoalsRes, liveRes, expRes, ...monthNWResults] = await Promise.all([
+        const last6MonthLabels = last6MonthDates.map(d => d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }));
+
+        const [netWorthRes, liveRes, ...rest] = await Promise.all([
           assetsAPI.getNetWorth(),
-          goalsAPI.getAll(),
           transactionsAPI.getLiveMonthlySummary(),
-          getExpensesData(currentMonthLabel),
           ...last6MonthDates.map(d =>
             assetsAPI.getNetWorth(null, d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }))
           ),
+          ...last6MonthLabels.map(label => getExpensesData(label)),
         ]);
+
+        const monthNWResults = rest.slice(0, 6);
+        const monthExpResults = rest.slice(6, 12);
 
         const live = liveRes.data;
 
@@ -60,14 +64,83 @@ const DashboardScreen = () => {
 
         setSnapshotData(mergedSnapshot);
         setNetWorthData(netWorthRes.data);
-        setGoals(allGoalsRes.data || []);
-        setExpenseData(expRes);
 
         const history = last6MonthDates.map((d, i) => ({
           month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
           netWorth: monthNWResults[i]?.data?.totalNetWorth || null,
         }));
         setTrendHistory(history);
+
+        // Credit card spend comes from statement-uploaded categories (statementType
+        // like "HDFC Credit Card"), not the unused top-level `creditCards` field.
+        // One bar per individual card (owner + bank), all in a single chart.
+        const OWNER_LABEL = { anurag: 'Anurag', nidhi: 'Nidhi' };
+        const monthCardTotals = monthExpResults.map(exp => {
+          const totals = {};
+          (exp?.categories || []).forEach(c => {
+            if (!c.statementType?.includes('Credit Card')) return;
+            const bank = c.statementType.replace(' Credit Card', '');
+            const key = `${OWNER_LABEL[c.account] || c.account} · ${bank}`;
+            totals[key] = (totals[key] || 0) + (c.amount || 0);
+          });
+          return totals;
+        });
+
+        const CARD_PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+        const cardKeys = Array.from(new Set(monthCardTotals.flatMap(t => Object.keys(t)))).sort();
+        setCcCards(cardKeys.map((key, i) => ({ key, color: CARD_PALETTE[i % CARD_PALETTE.length] })));
+
+        const ccByMonth = last6MonthDates.map((d, i) => {
+          const totals = monthCardTotals[i];
+          const row = { month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }), total: 0 };
+          cardKeys.forEach(key => {
+            row[key] = totals[key] || 0;
+            row.total += totals[key] || 0;
+          });
+          return row;
+        });
+        setCcHistory(ccByMonth);
+
+        // Total household expense per month — Anurag + Nidhi + joint, combined.
+        // Matches the definition used across the Expenses tab: direct UPI/cash spend +
+        // all categorized spend (which already includes card statement uploads) +
+        // fixed committed expenses + SIPs.
+        const computeTotalSpend = (exp) => {
+          if (!exp) return 0;
+          const direct = exp.expenses || {};
+          const catTotal = (exp.categories || []).reduce((s, c) => s + (c.amount || 0), 0);
+          const fixedTotal = (exp.fixedExpenses || [])
+            .filter(fe => (fe.section ?? 'fixed') === 'fixed')
+            .reduce((s, f) => s + (f.amount || 0), 0);
+          return (direct.anurag || 0) + (direct.nidhi || 0) + (direct.joint || 0) + catTotal + fixedTotal + (exp.sips || 0);
+        };
+
+        const totalExpHistory = last6MonthDates.map((d, i) => ({
+          month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
+          total: computeTotalSpend(monthExpResults[i]),
+        }));
+        setTotalExpenseHistory(totalExpHistory);
+
+        // Monthly savings — combined household surplus, same formula as the live
+        // summary card (income − expenses − CC spend). getExpensesData() already
+        // resolves salary/sips/fixedExpenses against the global defaults per month.
+        const computeSavings = (exp) => {
+          if (!exp) return 0;
+          const totalIncome = (exp.income?.anurag?.salary || 0) + (exp.income?.anurag?.bonus || 0)
+                             + (exp.income?.nidhi?.salary  || 0) + (exp.income?.nidhi?.bonus  || 0);
+          const catTotal    = (exp.categories || []).reduce((s, c) => s + (c.amount || 0), 0);
+          const fixedTotal  = (exp.fixedExpenses || []).reduce((s, f) => s + (f.amount || 0), 0);
+          const direct      = exp.expenses || {};
+          const totalExpenses = (direct.joint || 0) + (direct.anurag || 0) + (direct.nidhi || 0)
+                               + fixedTotal + (exp.sips || 0) + catTotal;
+          return totalIncome - totalExpenses;
+        };
+
+        const savingsHist = last6MonthDates.map((d, i) => ({
+          month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
+          savings: computeSavings(monthExpResults[i]),
+        }));
+        setSavingsHistory(savingsHist);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -87,7 +160,6 @@ const DashboardScreen = () => {
 
   const growth = snapshotData?.growth || {};
   const totalNetWorth = netWorthData?.totalNetWorth || 0;
-  const completedGoals = goals.filter(g => g.status === 'Completed').length;
 
   return (
     <div className="space-y-4">
@@ -258,182 +330,161 @@ const DashboardScreen = () => {
 
       </div>
 
-      {/* ── BOTTOM ROW: Monthly Snapshot (narrow) │ Spending │ Goals ── */}
+      {/* ── BOTTOM ROW: Total Expenses (narrow) │ Credit Card Spend │ Goals ── */}
       <div className="grid grid-cols-[2fr_3fr_3fr] gap-4 items-stretch">
 
-        {/* 1st: Monthly Snapshot */}
+        {/* 1st: Total Expenses — month wise, household combined */}
         <div className="bg-white rounded-2xl p-5 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Snapshot</h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-semibold text-gray-900">Total Expenses</h3>
             <Link to="/expenses" className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group">
               <span>Details</span>
               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Anurag + Nidhi, last 6 months</p>
 
-          {!expenseData ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Loading...</div>
-          ) : (() => {
-            const expDirect  = expenseData.expenses || {};
-            const anuragCC   = (expenseData.creditCards || []).filter(c => c.owner === 'anurag').reduce((s, c) => s + (c.spend || 0), 0);
-            const nidhiCC    = (expenseData.creditCards || []).filter(c => c.owner === 'nidhi' ).reduce((s, c) => s + (c.spend || 0), 0);
-
-            const anuragCat  = (expenseData.categories || []).filter(c => c.account === 'anurag').reduce((s, c) => s + (c.amount || 0), 0);
-            const nidhiCat   = (expenseData.categories || []).filter(c => c.account === 'nidhi' ).reduce((s, c) => s + (c.amount || 0), 0);
-            const jointCat   = (expenseData.categories || []).filter(c => (c.account || 'joint') === 'joint').reduce((s, c) => s + (c.amount || 0), 0);
-
-            const totalFixed = (expenseData.fixedExpenses || []).filter(fe => (fe.section ?? 'fixed') === 'fixed').reduce((s, f) => s + (f.amount || 0), 0);
-
-            const anuragSpend = (expDirect.anurag || 0) + anuragCC + anuragCat;
-            const nidhiSpend  = (expDirect.nidhi  || 0) + nidhiCC  + nidhiCat;
-            const totalSpend  = anuragSpend + nidhiSpend + (expDirect.joint || 0) + jointCat + totalFixed + (expenseData.sips || 0);
-
-            const people = [
-              { label: 'Anurag', amount: anuragSpend, direct: expDirect.anurag || 0, cc: anuragCC, cat: anuragCat, from: 'from-blue-500',   to: 'to-blue-700',   ring: 'ring-blue-300'   },
-              { label: 'Nidhi',  amount: nidhiSpend,  direct: expDirect.nidhi  || 0, cc: nidhiCC,  cat: nidhiCat,  from: 'from-purple-500', to: 'to-purple-700', ring: 'ring-purple-300' },
-            ];
-
-            return (
-              <div className="flex flex-col gap-3 flex-1">
-                {/* Total expenses pill */}
-                <div className="bg-gray-900 rounded-xl px-3 py-2.5 flex flex-col gap-0.5">
-                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Total Expenses</span>
-                  <span className="text-lg font-bold text-white leading-tight">{formatFullCurrency(totalSpend)}</span>
-                </div>
-
-                {/* Per-person tiles */}
-                {people.map(({ label, amount, direct, cc, cat, from, to, ring }) => {
-                  const pct = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
-                  return (
-                    <div key={label} className={`bg-gradient-to-br ${from} ${to} rounded-2xl p-3.5 flex flex-col gap-1.5 flex-1`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-6 h-6 rounded-full bg-white/20 ring-2 ${ring} flex items-center justify-center flex-shrink-0`}>
-                            <span className="text-[10px] font-bold text-white">{label[0]}</span>
-                          </div>
-                          <span className="text-xs font-semibold text-white/90">{label}</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-white/70 bg-white/15 px-1.5 py-0.5 rounded-full">{pct}%</span>
-                      </div>
-                      <p className="text-xl font-bold text-white leading-none">{formatFullCurrency(amount)}</p>
-                      <div className="space-y-0.5">
-                        {direct > 0 && <p className="text-[10px] text-white/65">UPI/cash {formatCurrency(direct, true)}</p>}
-                        {cc     > 0 && <p className="text-[10px] text-white/65">CC {formatCurrency(cc, true)}</p>}
-                        {cat    > 0 && <p className="text-[10px] text-white/65">Categories {formatCurrency(cat, true)}</p>}
-                        {direct === 0 && cc === 0 && cat === 0 && <p className="text-[10px] text-white/50 italic">No data yet</p>}
-                      </div>
-                    </div>
-                  );
-                })}
+          {totalExpenseHistory.every(m => m.total === 0) ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+              <p className="text-sm text-gray-400">No expense data yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add your monthly transactions.</p>
+            </div>
+          ) : (
+            <>
+              <div className="h-[110px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={totalExpenseHistory} margin={{ top: 18, right: 16, left: 16, bottom: 0 }} barCategoryGap="40%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis hide domain={[0, 'auto']} />
+                    <Tooltip
+                      formatter={(value) => [formatFullCurrency(value), 'Total Expenses']}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                      labelStyle={{ fontWeight: 600, color: '#374151' }}
+                      cursor={{ fill: '#f9fafb' }}
+                    />
+                    {/* stem */}
+                    <Bar dataKey="total" fill="#0d9488" fillOpacity={0.55} barSize={3} radius={[2, 2, 0, 0]} />
+                    {/* dot + value label, no connecting line */}
+                    <Line
+                      type="monotone"
+                      dataKey="total"
+                      stroke="transparent"
+                      dot={{ r: 5, fill: '#0d9488', strokeWidth: 2, stroke: '#fff' }}
+                      activeDot={{ r: 6, fill: '#0d9488', strokeWidth: 2, stroke: '#fff' }}
+                      isAnimationActive={false}
+                    >
+                      <LabelList
+                        dataKey="total"
+                        position="top"
+                        formatter={(value) => (value > 0 ? formatCurrency(value, false) : '')}
+                        style={{ fontSize: 9.5, fontWeight: 600, fill: '#374151' }}
+                      />
+                    </Line>
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
-            );
-          })()}
+            </>
+          )}
         </div>
 
-        {/* 2nd: This Month's Spending */}
+        {/* 2nd: Credit Card Spend — month wise, per card, faceted by owner */}
         <div className="bg-white rounded-2xl p-5 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-gray-900">This Month&apos;s Spending</h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-semibold text-gray-900">Credit Card Spend</h3>
             <Link to="/expenses" className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group">
               <span>View all</span>
               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Last 6 months, by card</p>
 
-          {!expenseData ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">Loading...</div>
-          ) : (() => {
-            const allItems = [
-              ...(expenseData.categories || []).map(c => ({ key: `cat-${c.name}`, name: c.name, amount: c.amount, icon: c.icon || '📌' })),
-              ...(expenseData.fixedExpenses || []).map(fe => ({ key: `fe-${fe.id}`, name: fe.label, amount: fe.amount, icon: fe.section === 'committed' ? '🔄' : '📌' })),
-            ].sort((a, b) => b.amount - a.amount).slice(0, 10);
-
-            if (!allItems.length) {
-              return (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
-                  <p className="text-sm text-gray-400">No spending data yet.</p>
-                  <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add your monthly transactions.</p>
-                </div>
-              );
-            }
-
-            const maxAmt = allItems[0].amount || 1;
-            return (
-              <div className="overflow-y-auto max-h-64 space-y-2.5 pr-1 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
-                {allItems.map(item => (
-                  <div key={item.key} className="flex items-center gap-3">
-                    <span className="text-base w-6 text-center flex-shrink-0">{item.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-800 truncate">{item.name}</span>
-                        <span className="text-sm font-semibold text-gray-900 ml-2 flex-shrink-0">{formatFullCurrency(item.amount)}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-1.5 bg-teal-500 rounded-full" style={{ width: `${(item.amount / maxAmt) * 100}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          {ccHistory.every(m => m.total === 0) ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+              <p className="text-sm text-gray-400">No credit card spend recorded yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add card statements.</p>
+            </div>
+          ) : (
+            <div className="h-[140px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ccHistory} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barGap={2} barCategoryGap="24%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                  <YAxis hide domain={[0, 'auto']} />
+                  <Tooltip
+                    formatter={(value, name) => [formatFullCurrency(value), name]}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                    labelStyle={{ fontWeight: 600, color: '#374151' }}
+                    cursor={{ fill: '#f9fafb' }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    height={28}
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: 10, color: '#6b7280' }}
+                  />
+                  {ccCards.map(card => (
+                    <Bar key={card.key} dataKey={card.key} name={card.key} fill={card.color} radius={[3, 3, 0, 0]} maxBarSize={11} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
-        {/* 3rd: Goals */}
+        {/* 3rd: Savings — month wise, household combined */}
         <div className="bg-white rounded-2xl p-5 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h3 className="text-base font-semibold text-gray-900">Goals</h3>
-              <span className="text-sm text-gray-400">{completedGoals}/{goals.length} done</span>
-            </div>
-            <Link to="/goals" className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group">
-              <span>View all</span>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-base font-semibold text-gray-900">Savings</h3>
+            <Link to="/expenses" className="flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group">
+              <span>Details</span>
               <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Anurag + Nidhi, last 6 months</p>
 
-          {goals.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-2">
-              <p className="text-sm text-gray-500">No goals set yet</p>
-              <button onClick={() => navigate('/goals')} className="text-sm text-teal-600 hover:underline">
-                Add your first goal →
-              </button>
+          {savingsHistory.every(m => m.savings === 0) ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+              <p className="text-sm text-gray-400">No savings data yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add income and expenses.</p>
             </div>
-          ) : (
-            <div className="space-y-3 flex-1">
-              {[...goals].sort((a, b) => (b.currentAmount / b.targetAmount) - (a.currentAmount / a.targetAmount)).map((goal) => {
-                const dotColor = { Completed: 'bg-green-500', Ahead: 'bg-teal-500', 'On Track': 'bg-blue-500' }[goal.status] || 'bg-orange-400';
-                const barColor = { Completed: 'bg-green-500', Ahead: 'bg-teal-500', 'On Track': 'bg-blue-500' }[goal.status] || 'bg-orange-400';
-                const progress = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-                const remaining = goal.targetAmount - goal.currentAmount;
-                return (
-                  <button
-                    key={goal._id}
-                    onClick={() => navigate('/goals')}
-                    className="w-full flex items-start gap-3 group hover:bg-gray-50 rounded-xl px-2 py-1.5 -mx-2 transition-colors text-left"
-                  >
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${dotColor}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">{goal.name}</p>
-                        <span className="text-xs font-semibold text-gray-500 flex-shrink-0 ml-2">{progress.toFixed(0)}%</span>
+          ) : (() => {
+            const maxAbs = Math.max(1, ...savingsHistory.map(m => Math.abs(m.savings)));
+            const R = 22;
+            const CIRC = 2 * Math.PI * R;
+            return (
+              <div className="flex-1 flex items-center">
+                <div className="grid grid-cols-6 gap-1 w-full">
+                  {savingsHistory.map(m => {
+                    const hasData = m.savings !== 0;
+                    const frac = hasData ? Math.abs(m.savings) / maxAbs : 0;
+                    const isNeg = m.savings < 0;
+                    const color = isNeg ? '#e34948' : '#0d9488';
+                    return (
+                      <div key={m.month} className="flex flex-col items-center gap-1">
+                        <svg viewBox="0 0 60 60" className="w-full max-w-[52px]">
+                          <circle cx="30" cy="30" r={R} fill="none" stroke="#f0efec" strokeWidth="5" />
+                          {hasData && (
+                            <circle
+                              cx="30" cy="30" r={R} fill="none" stroke={color} strokeWidth="5"
+                              strokeLinecap="round"
+                              strokeDasharray={`${CIRC * frac} ${CIRC}`}
+                              transform="rotate(-90 30 30)"
+                            />
+                          )}
+                          <text x="30" y="34" textAnchor="middle" fontSize="10.5" fontWeight="700" fill={hasData ? '#111827' : '#9ca3af'}>
+                            {hasData ? formatCurrency(m.savings, false).replace('₹', '') : '—'}
+                          </text>
+                        </svg>
+                        <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">{m.month}</span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-1.5 mb-1">
-                        <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${progress}%` }} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400">{formatCurrency(goal.currentAmount, true)} saved</span>
-                        {remaining > 0
-                          ? <span className="text-xs text-gray-400">{formatCurrency(remaining, true)} left</span>
-                          : <span className="text-xs text-green-600 font-medium">Completed!</span>
-                        }
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
       </div>

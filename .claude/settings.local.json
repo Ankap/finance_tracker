@@ -8,7 +8,13 @@
       "Bash(node -e \"require\\(''xlsx''\\); console.log\\(''OK''\\)\")",
       "Bash(npx next *)",
       "Bash(npm run *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(command -v chromium-cli)",
+      "Bash(find / -maxdepth 4 -iname \"chromium-cli*\")",
+      "Bash(npm ls *)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(npx eslint *)",
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\\\\n\")"
     ]
   }
 }
