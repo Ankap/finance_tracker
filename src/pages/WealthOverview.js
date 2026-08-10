@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, TrendingDown, Sparkles, Maximize2, X, Trash2, Pencil } from 'lucide-react';
+import { TrendingUp, TrendingDown, Sparkles, Maximize2, X, Trash2, Pencil, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { assetsAPI } from '../services/api';
 import { formatCurrency, formatPercentage, getAssetIcon, formatDate } from '../utils/formatters';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -182,6 +183,7 @@ const WealthOverview = () => {
   const [confirmDeleteAsset, setConfirmDeleteAsset] = useState(null);
   const [editingAsset, setEditingAsset]             = useState(null);
   const [expandedGroups, setExpandedGroups]         = useState(new Set());
+  const [exporting, setExporting]                   = useState(false);
 
   const fetchData = useCallback(async (silent = false) => {
     try {
@@ -302,6 +304,159 @@ const WealthOverview = () => {
     fetchData(true);
   };
 
+  const CURRENCY_FMT = '"₹"#,##0;−"₹"#,##0';
+  const PERCENT_FMT  = '0.0"%";−0.0"%"';
+
+  // Apply a number format to a rectangular block of cells (post-pass — safer than
+  // trying to feed pre-styled cell objects through json_to_sheet/aoa_to_sheet, which
+  // only understand plain primitives and would otherwise stringify anything else).
+  const applyFormat = (ws, colLetters, startRow, endRow, format) => {
+    colLetters.forEach(col => {
+      for (let r = startRow; r <= endRow; r++) {
+        const addr = `${col}${r}`;
+        if (ws[addr]) ws[addr].z = format;
+      }
+    });
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Export always covers every owner (Joint + Anurag + Nidhi), regardless of
+      // the on-screen filter pill — re-fetch unfiltered rather than reusing `assets`.
+      const selectedIdx    = MONTHS.indexOf(selectedMonth);
+      const prevMonthLabel = selectedIdx >= 0 && selectedIdx + 1 < MONTHS.length ? MONTHS[selectedIdx + 1] : null;
+      const trendMonths    = [...MONTHS].reverse(); // oldest → newest
+
+      const [allAssetsRes, currentNWRes, prevNWRes, ...trendRes] = await Promise.all([
+        assetsAPI.getAll(null, selectedMonth),
+        assetsAPI.getNetWorth(null, selectedMonth),
+        prevMonthLabel ? assetsAPI.getNetWorth(null, prevMonthLabel) : Promise.resolve({ data: null }),
+        ...trendMonths.map(m => assetsAPI.getNetWorth(null, m)),
+      ]);
+
+      const allAssets    = allAssetsRes.data || [];
+      const currentNW    = currentNWRes.data?.totalNetWorth || 0;
+      const breakdown     = currentNWRes.data?.breakdown || {};
+      const breakdownRows = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+      const principalNW  = allAssets.reduce((s, a) => s + (a.principalAmount || 0), 0);
+      const gain          = currentNW - principalNW;
+      const gainPct       = principalNW > 0 ? (gain / principalNW) * 100 : 0;
+      const prevNW        = prevNWRes?.data?.totalNetWorth || 0;
+      const momChange     = prevNW > 0 ? currentNW - prevNW : 0;
+      const momChangePct  = prevNW > 0 ? (momChange / prevNW) * 100 : 0;
+
+      const ownerTotals = allAssets.reduce((acc, a) => {
+        const key = a.owner || 'Joint';
+        acc[key] = (acc[key] || 0) + (a.currentValue || 0);
+        return acc;
+      }, {});
+      const ownerRows = Object.entries(ownerTotals).sort((a, b) => b[1] - a[1]);
+
+      // ── Sheet 1: Monthly Snapshot ──
+      // Row layout (1-indexed): 1 title, 2 blank, 3-9 headline figures, 10 blank,
+      // 11 section title, 12 column headers, 13..(12+N) asset-type rows, blank,
+      // section title, column headers, then M owner rows.
+      const typeHeaderRow  = 12;
+      const typeDataStart  = typeHeaderRow + 1;
+      const typeDataEnd    = typeDataStart + breakdownRows.length - 1;
+      const ownerTitleRow  = typeDataEnd + 2;
+      const ownerHeaderRow = ownerTitleRow + 1;
+      const ownerDataStart = ownerHeaderRow + 1;
+      const ownerDataEnd   = ownerDataStart + ownerRows.length - 1;
+
+      const snapshotRows = [
+        [`Wealth Snapshot — ${selectedMonth}`],
+        [],
+        ['Total Net Worth',      currentNW],
+        ['Principal Invested',   principalNW],
+        ['Total Gain',           gain],
+        ['Total Gain %',         gainPct],
+        ['Month-on-Month Change', momChange],
+        ['Month-on-Month Change %', momChangePct],
+        ['Total Assets',         allAssets.length],
+        [],
+        ['Breakdown by Asset Type'],
+        ['Type', 'Current Value', '% of Net Worth'],
+        ...breakdownRows.map(([name, value]) => [name, value, currentNW > 0 ? (value / currentNW) * 100 : 0]),
+        [],
+        ['Breakdown by Owner'],
+        ['Owner', 'Current Value', '% of Net Worth'],
+        ...ownerRows.map(([name, value]) => [name, value, currentNW > 0 ? (value / currentNW) * 100 : 0]),
+      ];
+      const wsSnapshot = XLSX.utils.aoa_to_sheet(snapshotRows);
+      wsSnapshot['!cols'] = [{ wch: 24 }, { wch: 18 }, { wch: 16 }];
+      applyFormat(wsSnapshot, ['B'], 3, 5, CURRENCY_FMT);   // net worth, principal, gain
+      applyFormat(wsSnapshot, ['B'], 6, 6, PERCENT_FMT);    // gain %
+      applyFormat(wsSnapshot, ['B'], 7, 7, CURRENCY_FMT);   // MoM change
+      applyFormat(wsSnapshot, ['B'], 8, 8, PERCENT_FMT);    // MoM change %
+      if (breakdownRows.length) {
+        applyFormat(wsSnapshot, ['B'], typeDataStart, typeDataEnd, CURRENCY_FMT);
+        applyFormat(wsSnapshot, ['C'], typeDataStart, typeDataEnd, PERCENT_FMT);
+      }
+      if (ownerRows.length) {
+        applyFormat(wsSnapshot, ['B'], ownerDataStart, ownerDataEnd, CURRENCY_FMT);
+        applyFormat(wsSnapshot, ['C'], ownerDataStart, ownerDataEnd, PERCENT_FMT);
+      }
+
+      // ── Sheet 2: Asset Details — flat list, sorted by current value desc ──
+      const detailSource = [...allAssets].sort((a, b) => (b.currentValue || 0) - (a.currentValue || 0));
+      const detailRows = detailSource.map(a => {
+        const assetGain    = (a.currentValue || 0) - (a.principalAmount || 0);
+        const assetGainPct = a.principalAmount > 0 ? (assetGain / a.principalAmount) * 100 : '';
+        return {
+          'Asset Type':      a.name,
+          'Owner':           a.owner || 'Joint',
+          'Account Details': a.accountDetails || '',
+          'Added':           getAddedDate(a) || '',
+          'Principal':       a.principalAmount || 0,
+          'Current Value':   a.currentValue || 0,
+          'Gain':            assetGain,
+          'Gain %':          assetGainPct,
+        };
+      });
+      const wsDetails = XLSX.utils.json_to_sheet(detailRows);
+      wsDetails['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
+      if (detailRows.length) {
+        applyFormat(wsDetails, ['E', 'F', 'G'], 2, detailRows.length + 1, CURRENCY_FMT);
+        applyFormat(wsDetails, ['H'], 2, detailRows.length + 1, PERCENT_FMT);
+      }
+
+      // ── Sheet 3: 12-Month Trend ──
+      let prevTrendNW = null;
+      const trendRows = trendMonths.map((label, i) => {
+        const nw = trendRes[i]?.data?.totalNetWorth || 0;
+        const change = (prevTrendNW != null && prevTrendNW > 0 && nw > 0) ? nw - prevTrendNW : '';
+        const changePct = (change !== '' && prevTrendNW > 0) ? (change / prevTrendNW) * 100 : '';
+        prevTrendNW = nw > 0 ? nw : prevTrendNW;
+        return {
+          'Month':        label,
+          'Net Worth':    nw,
+          'MoM Change':   change,
+          'MoM Change %': changePct,
+        };
+      });
+      const wsTrend = XLSX.utils.json_to_sheet(trendRows);
+      wsTrend['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+      if (trendRows.length) {
+        applyFormat(wsTrend, ['B', 'C'], 2, trendRows.length + 1, CURRENCY_FMT);
+        applyFormat(wsTrend, ['D'], 2, trendRows.length + 1, PERCENT_FMT);
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsSnapshot, 'Monthly Snapshot');
+      XLSX.utils.book_append_sheet(wb, wsDetails, 'Asset Details');
+      XLSX.utils.book_append_sheet(wb, wsTrend, '12-Month Trend');
+
+      const filename = `Wealth_Snapshot_${selectedMonth.replace(' ', '_')}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    } catch (error) {
+      console.error('Error exporting wealth data:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const isPositiveChange = nwChange >= 0;
 
   return (
@@ -325,6 +480,22 @@ const WealthOverview = () => {
               {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
+
+          {/* Export to Excel */}
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            title="Export monthly snapshot, asset details, and 12-month trend"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 9,
+              padding: '7px 12px', fontSize: 13, fontWeight: 700, color: '#374151',
+              cursor: exporting ? 'default' : 'pointer', opacity: exporting ? 0.6 : 1,
+            }}
+          >
+            <Download size={14} />
+            {exporting ? 'Exporting…' : 'Export to Excel'}
+          </button>
 
           {/* Divider */}
           <div style={{ width: 1, height: 20, background: '#e5e7eb' }} />

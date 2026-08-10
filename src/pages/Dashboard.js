@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { assetsAPI, transactionsAPI } from '../services/api';
 import { getExpensesData } from '../lib/expenses.data';
 import { formatFullCurrency, formatCurrency } from '../utils/formatters';
-import { Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart, Bar, BarChart, ComposedChart, Legend, LabelList } from 'recharts';
+import { Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart, Bar, BarChart, ComposedChart, LabelList, Cell } from 'recharts';
 
 // --- Component ---
 
@@ -88,14 +88,25 @@ const DashboardScreen = () => {
 
         const CARD_PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
         const cardKeys = Array.from(new Set(monthCardTotals.flatMap(t => Object.keys(t)))).sort();
-        setCcCards(cardKeys.map((key, i) => ({ key, color: CARD_PALETTE[i % CARD_PALETTE.length] })));
+        const cardColorByKey = Object.fromEntries(cardKeys.map((key, i) => [key, CARD_PALETTE[i % CARD_PALETTE.length]]));
+        setCcCards(cardKeys.map(key => ({ key, color: cardColorByKey[key] })));
 
+        // Bars within each month are ranked largest → smallest (not a fixed card
+        // order) so the cluster reads high-to-low left-to-right every month —
+        // color still identifies the card consistently, just position doesn't.
         const ccByMonth = last6MonthDates.map((d, i) => {
           const totals = monthCardTotals[i];
+          const ranked = cardKeys
+            .map(key => ({ key, value: totals[key] || 0, color: cardColorByKey[key] }))
+            .filter(e => e.value > 0)
+            .sort((a, b) => b.value - a.value);
+
           const row = { month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }), total: 0 };
-          cardKeys.forEach(key => {
-            row[key] = totals[key] || 0;
-            row.total += totals[key] || 0;
+          ranked.forEach((e, idx) => {
+            row[`pos${idx}`] = e.value;
+            row[`pos${idx}Key`] = e.key;
+            row[`pos${idx}Color`] = e.color;
+            row.total += e.value;
           });
           return row;
         });
@@ -124,8 +135,9 @@ const DashboardScreen = () => {
         // Monthly savings — combined household surplus, same formula as the live
         // summary card (income − expenses − CC spend). getExpensesData() already
         // resolves salary/sips/fixedExpenses against the global defaults per month.
+        // Rate = savings as a % of income, same definition used across the Expenses tab.
         const computeSavings = (exp) => {
-          if (!exp) return 0;
+          if (!exp) return { savings: 0, rate: 0 };
           const totalIncome = (exp.income?.anurag?.salary || 0) + (exp.income?.anurag?.bonus || 0)
                              + (exp.income?.nidhi?.salary  || 0) + (exp.income?.nidhi?.bonus  || 0);
           const catTotal    = (exp.categories || []).reduce((s, c) => s + (c.amount || 0), 0);
@@ -133,13 +145,15 @@ const DashboardScreen = () => {
           const direct      = exp.expenses || {};
           const totalExpenses = (direct.joint || 0) + (direct.anurag || 0) + (direct.nidhi || 0)
                                + fixedTotal + (exp.sips || 0) + catTotal;
-          return totalIncome - totalExpenses;
+          const savings = totalIncome - totalExpenses;
+          const rate = totalIncome > 0 ? Math.round((savings / totalIncome) * 100) : 0;
+          return { savings, rate };
         };
 
-        const savingsHist = last6MonthDates.map((d, i) => ({
-          month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
-          savings: computeSavings(monthExpResults[i]),
-        }));
+        const savingsHist = last6MonthDates.map((d, i) => {
+          const { savings, rate } = computeSavings(monthExpResults[i]);
+          return { month: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }), savings, rate };
+        });
         setSavingsHistory(savingsHist);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -351,7 +365,7 @@ const DashboardScreen = () => {
             </div>
           ) : (
             <>
-              <div className="h-[110px]">
+              <div className="flex-1 min-h-[110px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={totalExpenseHistory} margin={{ top: 18, right: 16, left: 16, bottom: 0 }} barCategoryGap="40%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
@@ -405,31 +419,56 @@ const DashboardScreen = () => {
               <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add card statements.</p>
             </div>
           ) : (
-            <div className="h-[140px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ccHistory} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barGap={2} barCategoryGap="24%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis hide domain={[0, 'auto']} />
-                  <Tooltip
-                    formatter={(value, name) => [formatFullCurrency(value), name]}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-                    labelStyle={{ fontWeight: 600, color: '#374151' }}
-                    cursor={{ fill: '#f9fafb' }}
-                  />
-                  <Legend
-                    verticalAlign="top"
-                    height={28}
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 10, color: '#6b7280' }}
-                  />
-                  {ccCards.map(card => (
-                    <Bar key={card.key} dataKey={card.key} name={card.key} fill={card.color} radius={[3, 3, 0, 0]} maxBarSize={11} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              {/* Custom legend — recharts' default center-aligns each wrapped line,
+                  which reads as misaligned once cards spill onto a 2nd row. */}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1.5">
+                {ccCards.map(card => (
+                  <div key={card.key} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: card.color }} />
+                    <span className="text-[10px] text-gray-500">{card.key}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex-1 min-h-[124px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={ccHistory} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barGap={2} barCategoryGap="24%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                    <YAxis hide domain={[0, 'auto']} />
+                    <Tooltip
+                      cursor={{ fill: '#f9fafb' }}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                      content={({ active, label, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0]?.payload;
+                        if (!row) return null;
+                        const items = ccCards
+                          .map((_, idx) => ({ name: row[`pos${idx}Key`], value: row[`pos${idx}`], color: row[`pos${idx}Color`] }))
+                          .filter(it => it.value > 0);
+                        return (
+                          <div style={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', background: '#fff', padding: '8px 10px' }}>
+                            <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 4px' }}>{label}</p>
+                            {items.map(it => (
+                              <p key={it.name} style={{ margin: '2px 0', color: it.color, fontWeight: 600 }}>
+                                {it.name}: <span style={{ color: '#374151', fontWeight: 500 }}>{formatFullCurrency(it.value)}</span>
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                    {ccCards.map((_, idx) => (
+                      <Bar key={idx} dataKey={`pos${idx}`} radius={[3, 3, 0, 0]} maxBarSize={11}>
+                        {ccHistory.map((row, i) => (
+                          <Cell key={i} fill={row[`pos${idx}Color`] || 'transparent'} />
+                        ))}
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </>
           )}
         </div>
 
@@ -450,32 +489,37 @@ const DashboardScreen = () => {
               <p className="text-xs text-gray-400 mt-1">Visit the Expenses tab to add income and expenses.</p>
             </div>
           ) : (() => {
-            const maxAbs = Math.max(1, ...savingsHistory.map(m => Math.abs(m.savings)));
-            const R = 22;
+            const R = 32;
             const CIRC = 2 * Math.PI * R;
             return (
               <div className="flex-1 flex items-center">
-                <div className="grid grid-cols-6 gap-1 w-full">
+                <div className="grid grid-cols-6 gap-1 w-full h-full items-center">
                   {savingsHistory.map(m => {
                     const hasData = m.savings !== 0;
-                    const frac = hasData ? Math.abs(m.savings) / maxAbs : 0;
                     const isNeg = m.savings < 0;
+                    // Positive: fraction of income saved. Negative: how deep past 0%, capped at a full ring.
+                    const frac = hasData ? Math.min(1, Math.abs(m.rate) / 100) : 0;
                     const color = isNeg ? '#e34948' : '#0d9488';
                     return (
-                      <div key={m.month} className="flex flex-col items-center gap-1">
-                        <svg viewBox="0 0 60 60" className="w-full max-w-[52px]">
-                          <circle cx="30" cy="30" r={R} fill="none" stroke="#f0efec" strokeWidth="5" />
+                      <div key={m.month} className="flex flex-col items-center gap-1.5">
+                        <svg viewBox="0 0 84 84" className="w-full max-w-[76px]">
+                          <circle cx="42" cy="42" r={R} fill="none" stroke="#f0efec" strokeWidth="7" />
                           {hasData && (
                             <circle
-                              cx="30" cy="30" r={R} fill="none" stroke={color} strokeWidth="5"
+                              cx="42" cy="42" r={R} fill="none" stroke={color} strokeWidth="7"
                               strokeLinecap="round"
                               strokeDasharray={`${CIRC * frac} ${CIRC}`}
-                              transform="rotate(-90 30 30)"
+                              transform="rotate(-90 42 42)"
                             />
                           )}
-                          <text x="30" y="34" textAnchor="middle" fontSize="10.5" fontWeight="700" fill={hasData ? '#111827' : '#9ca3af'}>
+                          <text x="42" y="40" textAnchor="middle" fontSize="13" fontWeight="700" fill={hasData ? '#111827' : '#9ca3af'}>
                             {hasData ? formatCurrency(m.savings, false).replace('₹', '') : '—'}
                           </text>
+                          {hasData && (
+                            <text x="42" y="54" textAnchor="middle" fontSize="10" fontWeight="600" fill={color}>
+                              {m.rate}%
+                            </text>
+                          )}
                         </svg>
                         <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">{m.month}</span>
                       </div>

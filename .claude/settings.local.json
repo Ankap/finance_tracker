@@ -14,7 +14,14 @@
       "Bash(npm ls *)",
       "Bash(curl -s http://localhost:3000/)",
       "Bash(npx eslint *)",
-      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\\\\n\")"
+      "Bash(curl -s http://localhost:3000/ -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(lsof -i :3000 -sTCP:LISTEN)",
+      "Bash(disown)",
+      "Bash(curl -s http://localhost:3000/wealth -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s \"http://localhost:3000/api/assets?month=August%202026\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"http://localhost:3000/api/assets?month=July%202026\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\)['data']; print\\(len\\(d\\), 'assets'\\)\")"
     ]
   }
 }
