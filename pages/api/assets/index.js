@@ -24,18 +24,31 @@ async function getSortedKeys() {
   return keys.sort();
 }
 
-async function getAllAssetsAggregated() {
-  const keys = await getSortedKeys();
+// Identifies the same logical asset across months even when its _id changed
+// (e.g. it was re-created via "create" instead of updated via "addSnapshot").
+// Without this, merging by _id alone lets a later month's entry sit alongside
+// an earlier month's instead of replacing it, double-counting the value.
+function assetIdentityKey(asset) {
+  return `${asset.owner || ''}|${asset.name || ''}|${asset.accountDetails || ''}`;
+}
+
+// Merge month snapshots oldest → newest, keyed by logical asset identity so each
+// asset contributes only its most recent recorded value.
+function mergeAssetsByIdentity(monthDataList) {
   const assetMap = {};
-  for (const key of keys) {
-    const data = await kv.get(key);
-    if (data?.assets) {
-      for (const asset of data.assets) {
-        assetMap[asset._id] = asset;
-      }
+  for (const data of monthDataList) {
+    if (!data?.assets) continue;
+    for (const asset of data.assets) {
+      assetMap[assetIdentityKey(asset)] = asset;
     }
   }
   return Object.values(assetMap);
+}
+
+async function getAllAssetsAggregated() {
+  const keys = await getSortedKeys();
+  const monthDataList = await Promise.all(keys.map(key => kv.get(key)));
+  return mergeAssetsByIdentity(monthDataList);
 }
 
 // Strict: return only assets explicitly stored for the given month.
@@ -51,16 +64,8 @@ async function getAssetsCarryForward(monthKey) {
   const targetKey = `assets:${monthKey}`;
   const priorKeys = allKeys.filter(k => k <= targetKey);
   if (priorKeys.length === 0) return [];
-  const assetMap = {};
-  for (const key of priorKeys) {
-    const d = await kv.get(key);
-    if (d?.assets) {
-      for (const asset of d.assets) {
-        assetMap[asset._id] = asset;
-      }
-    }
-  }
-  return Object.values(assetMap);
+  const monthDataList = await Promise.all(priorKeys.map(key => kv.get(key)));
+  return mergeAssetsByIdentity(monthDataList);
 }
 
 async function saveNetworthSnapshot(monthKey) {
